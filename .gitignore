@@ -1,0 +1,12 @@
+.DS_Store
+.dart_tool/
+.fvm/
+build/
+coverage/
+.idea/
+*.iml
+**/doc/api/
+packages/*/pubspec.lock
+.jewelry/
+/decisions.md
+/engineering.md

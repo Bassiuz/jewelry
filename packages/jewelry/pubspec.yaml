@@ -1,0 +1,23 @@
+name: jewelry
+description: Video goldens for Flutter integration tests. Write scenarios as plain Dart steps, record every frame on a clean emulator, compare frame by frame.
+version: 0.1.0
+repository: https://github.com/bassiuz/jewelry
+resolution: workspace
+
+environment:
+  sdk: ^3.13.7
+  flutter: ">=3.47.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_golden_animation: ^0.1.1
+  args: ^2.6.0
+  yaml: ^3.1.2
+
+dev_dependencies:
+  flutter_lints: ^6.0.0

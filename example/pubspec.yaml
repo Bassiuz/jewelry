@@ -1,0 +1,21 @@
+name: jewelry_example
+description: Example app with jewelry scenarios. Doubles as the package's own end-to-end test.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  jewelry: ^0.1.0
+
+flutter:
+  uses-material-design: true

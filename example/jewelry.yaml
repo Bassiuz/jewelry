@@ -1,0 +1,21 @@
+# Device profiles jewelry boots for this app. Goldens are keyed by profile.
+profiles:
+  pixel_8_pro_api_35:
+    platform: android
+    avd: Pixel_8_Pro_API_35
+  tablet:
+    platform: android
+    avd: Pixel_Tablet_API_35
+  iphone_16_ios_18:
+    platform: ios
+    simulator: iPhone 16
+    runtime: iOS 18.2
+
+# What `jewelry run` does without flags.
+default_profile: tablet   # --profile <name> picks another
+headless: true            # --window shows the emulator
+parallel: 1               # emulators at once, --parallel <n>
+
+# Comparison defaults, overridable on the CLI.
+drift: 30          # max frames a golden frame may appear late
+tolerance: 0.0     # pixel difference ratio allowed per frame
