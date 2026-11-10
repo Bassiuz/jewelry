@@ -9,8 +9,6 @@ scenario, captures every engine frame, and compares the result frame by frame
 against a recorded golden. Mismatches are reported like widget goldens: expected,
 actual, diff, plus the step and frame where it went wrong.
 
-<p align="center"><img src="doc/golden.gif" width="270" alt="A recorded golden: the example app's counter is tapped twice and goes from 0 to 2"><br><sub>A golden from <code>example/</code>: tap the button twice, the counter reads 2. Every frame is compared on the next run.</sub></p>
-
 Two packages, one repo:
 
 - `packages/jewelry`: the core. Scenario DSL, actions, frame capture, comparator, report, CLI. Firebase-agnostic.
@@ -19,11 +17,19 @@ Two packages, one repo:
 
 ## How a scenario looks
 
+This is `example/integration_test/scenarios/notes_test.dart`, next to the golden it recorded on a Pixel 8 Pro emulator:
+
+<table>
+<tr>
+<td>
+
 ```dart
-// integration_test/scenarios/login_test.dart
 void main() {
-  scenario('User logs in and sees their notes',
-    launch: launchApp,            // the app supplies this once
+  JewelryBinding.ensureInitialized();
+
+  scenario(
+    'User logs in and sees their notes',
+    launch: (ctx) => ctx.tester.pumpWidget(const NotesApp()),
     steps: [
       logInAs('anna@example.com', 'secret'),
       step('Open the notes list', (t) async {
@@ -37,13 +43,20 @@ void main() {
 
 // integration_test/steps/auth_steps.dart
 Step logInAs(String email, String password) =>
-  step('Log in as $email', (t) async {
-    await t.enterText('emailField', email);
-    await t.enterText('passwordField', password);
-    await t.tap('loginButton');
-    await t.waitFor('home');
-  });
+    step('Log in as $email', (t) async {
+      await t.enterText('emailField', email);
+      await t.enterText('passwordField', password);
+      await t.tap('loginButton');
+      await t.waitFor('home');
+    });
 ```
+
+</td>
+<td><img src="doc/golden.gif" width="270" alt="The recorded golden: log in as anna, land on the home screen, open the notes tab and see Groceries"></td>
+</tr>
+</table>
+
+Strings like `'notesTab'` are widget keys. The next run replays the same steps and compares all 210 frames against this recording.
 
 ## The loop
 

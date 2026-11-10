@@ -4,8 +4,10 @@ import 'package:jewelry/jewelry.dart';
 
 import 'scenarios/counter_test.dart' as s0;
 import 'scenarios/counter_three_test.dart' as s1;
+import 'scenarios/notes_test.dart' as s2;
 
 void main() => runScenarioSuite({
   'scenarios/counter_test.dart': s0.main,
   'scenarios/counter_three_test.dart': s1.main,
+  'scenarios/notes_test.dart': s2.main,
 });
