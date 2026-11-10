@@ -163,7 +163,7 @@ class AndroidDevice implements Device {
     // all) before they let the user do things.
     try {
       await _poll('the internet (dns.google)', () async {
-        final r = await _run(['shell', 'ping', '-c', '1', '-W', '2', 'nonexistent.invalid']);
+        final r = await _run(['shell', 'ping', '-c', '1', '-W', '2', 'dns.google']);
         return r.exitCode == 0 ? true : null;
       }, timeout: const Duration(minutes: 1));
     } on TimeoutException {
