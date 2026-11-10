@@ -99,6 +99,7 @@ profiles:
     platform: android
     avd: $avd${avds.isEmpty ? '   # no AVD found on this machine, create one first' : ''}
     # ram_mb: 4096   # for a large app that a 2 GB emulator kills
+    # internet: true # the emulator is offline by default
 
 # What `jewelry run` does without flags.
 default_profile: $name   # --profile <name> picks another

@@ -10,6 +10,7 @@ Device deviceForProfile(DeviceProfile p, {bool window = false, int? instance}) =
       'android' => AndroidDevice(
         p.avd!,
         ramMb: p.ramMb,
+        internet: p.internet,
         window: window,
         instance: instance,
       ),

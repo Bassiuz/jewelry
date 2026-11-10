@@ -7,6 +7,7 @@ class DeviceProfile {
     this.simulator,
     this.runtime,
     this.ramMb,
+    this.internet = false,
   });
 
   factory DeviceProfile.fromYaml(String name, Map<dynamic, dynamic> yaml) {
@@ -17,6 +18,7 @@ class DeviceProfile {
         platform: platform!,
         avd: _required(yaml, 'avd', name),
         ramMb: yaml['ram_mb'] as int?,
+        internet: yaml['internet'] as bool? ?? false,
       ),
       'ios' => DeviceProfile(
         name: name,
@@ -39,6 +41,11 @@ class DeviceProfile {
   /// Android only: overrides the AVD's RAM (`emulator -memory`). A stock
   /// 2 GB Play Store AVD thrashes under a large app and kills it.
   final int? ramMb;
+
+  /// Android: leave the emulator's network on. Off by default, so a
+  /// scenario only reaches what it fakes (Firebase and fakes go through
+  /// adb) and a run never depends on the emulator's flaky internet.
+  final bool internet;
 
   static String _required(
     Map<dynamic, dynamic> yaml,

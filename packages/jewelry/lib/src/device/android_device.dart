@@ -12,12 +12,16 @@ class AndroidDevice implements Device {
     this.avd, {
     String? sdk,
     this.ramMb,
+    this.internet = false,
     this.window = false,
     this.instance,
   }) : sdk = sdk ?? findSdk();
 
   final String avd;
   final int? ramMb;
+
+  /// See `DeviceProfile.internet`.
+  final bool internet;
 
   /// Shows the emulator window. Off by default: frames come from the app
   /// and device screenshots from adb, so nothing needs the window.
@@ -153,21 +157,44 @@ class AndroidDevice implements Device {
     // included (ActivityManager: "stop com.google.android.gms due to
     // installPackageLI"). No Play Store, no update. Images without the store
     // have nothing to disable, hence no exit check.
-    // A wiped emulator can report boot_completed before its network is up;
-    // the app then cannot reach the Firebase emulators on the host.
-    await _poll('the network to reach the host (10.0.2.2)', () async {
-      final r = await _run(['shell', 'ping', '-c', '1', '-W', '1', '10.0.2.2']);
-      return r.exitCode == 0 ? true : null;
-    }, timeout: const Duration(minutes: 2));
-    // Firebase goes through adb, but apps check for real internet (DNS and
-    // all) before they let the user do things.
-    try {
-      await _poll('the internet (dns.google)', () async {
-        final r = await _run(['shell', 'ping', '-c', '1', '-W', '2', 'dns.google']);
+    if (internet) {
+      // A wiped emulator can report boot_completed before its network is up;
+      // the app then cannot reach the Firebase emulators on the host.
+      await _poll('the network to reach the host (10.0.2.2)', () async {
+        final r = await _run([
+          'shell',
+          'ping',
+          '-c',
+          '1',
+          '-W',
+          '1',
+          '10.0.2.2',
+        ]);
         return r.exitCode == 0 ? true : null;
-      }, timeout: const Duration(minutes: 1));
-    } on TimeoutException {
-      throw _NoInternet('$avd ($serial) has no internet');
+      }, timeout: const Duration(minutes: 2));
+      // Firebase goes through adb, but apps check for real internet (DNS and
+      // all) before they let the user do things.
+      try {
+        await _poll('the internet (dns.google)', () async {
+          final r = await _run([
+            'shell',
+            'ping',
+            '-c',
+            '1',
+            '-W',
+            '2',
+            'dns.google',
+          ]);
+          return r.exitCode == 0 ? true : null;
+        }, timeout: const Duration(minutes: 1));
+      } on TimeoutException {
+        throw _NoInternet('$avd ($serial) has no internet');
+      }
+    } else {
+      // Offline: Firebase and the fakes are reached through adb, so the
+      // emulator's internet (now and then missing) cannot matter.
+      await _run(['shell', 'svc', 'wifi', 'disable']);
+      await _run(['shell', 'svc', 'data', 'disable']);
     }
     await _run([
       'shell',
