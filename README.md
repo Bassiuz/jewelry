@@ -19,9 +19,7 @@ Two packages, one repo:
 
 This is `example/integration_test/scenarios/notes_test.dart`, next to the golden it recorded on a Pixel 8 Pro emulator:
 
-<table>
-<tr>
-<td>
+<img align="right" src="doc/golden.gif" width="240" alt="The recorded golden: log in as anna, land on the home screen, open the notes tab and see Groceries">
 
 ```dart
 void main() {
@@ -51,10 +49,7 @@ Step logInAs(String email, String password) =>
     });
 ```
 
-</td>
-<td><img src="doc/golden.gif" width="270" alt="The recorded golden: log in as anna, land on the home screen, open the notes tab and see Groceries"></td>
-</tr>
-</table>
+<br clear="right">
 
 Strings like `'notesTab'` are widget keys. The next run replays the same steps and compares all 210 frames against this recording.
 
