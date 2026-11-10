@@ -9,6 +9,8 @@ scenario, captures every engine frame, and compares the result frame by frame
 against a recorded golden. Mismatches are reported like widget goldens: expected,
 actual, diff, plus the step and frame where it went wrong.
 
+<p align="center"><img src="doc/golden.gif" width="270" alt="A recorded golden: the example app's counter is tapped twice and goes from 0 to 2"><br><sub>A golden from <code>example/</code>: tap the button twice, the counter reads 2. Every frame is compared on the next run.</sub></p>
+
 Two packages, one repo:
 
 - `packages/jewelry`: the core. Scenario DSL, actions, frame capture, comparator, report, CLI. Firebase-agnostic.
