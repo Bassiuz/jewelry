@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'dart:ui' show ViewPadding;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -46,6 +48,7 @@ void scenario(
     while (JewelryBinding.isActive && tester.view.physicalSize.isEmpty) {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
+    if (JewelryBinding.isActive && Platform.isAndroid) _pinTopInset(tester);
     final ctx = ScenarioContext(tester);
     await given?.call(ctx);
 
@@ -161,4 +164,23 @@ Future<void> _guarded(
     },
   );
   return done.future;
+}
+
+/// Emulators of one AVD do not agree on the top inset: some add the camera
+/// cutout to the status bar (151 px on a Pixel 8 Pro), some do not (72 px),
+/// and a golden recorded on one then never matches a run on the other.
+/// The app gets the plain status bar, 24 dp, on every emulator.
+// ponytail: 24 dp is Android's status bar; a profile setting if a device
+// ever needs another.
+void _pinTopInset(WidgetTester tester) {
+  final view = tester.view;
+  final top = 24 * view.devicePixelRatio;
+  FakeViewPadding pinned(ViewPadding p) => FakeViewPadding(
+    left: p.left,
+    top: top,
+    right: p.right,
+    bottom: p.bottom,
+  );
+  view.padding = pinned(view.padding);
+  view.viewPadding = pinned(view.viewPadding);
 }
