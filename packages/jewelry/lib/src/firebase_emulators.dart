@@ -100,7 +100,20 @@ class FirebaseEmulators {
     }
   }
 
+  // The Firestore emulator now and then answers 499 "call already
+  // cancelled" while a previous app's listeners close; it passes on a retry.
   Future<void> _delete(String url) async {
+    for (var attempt = 1; ; attempt++) {
+      try {
+        return await _deleteOnce(url);
+      } on Exception {
+        if (attempt == 3) rethrow;
+        await Future<void>.delayed(Duration(seconds: attempt));
+      }
+    }
+  }
+
+  Future<void> _deleteOnce(String url) async {
     final client = HttpClient();
     try {
       final r = await client

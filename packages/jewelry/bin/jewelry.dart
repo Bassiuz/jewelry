@@ -321,6 +321,7 @@ Future<bool> _run({
     '${workers > 1 ? ', $workers emulators at once' : ''}',
   );
   final ran = <ScenarioResult>[];
+  String? stoppedEarly;
   // Two builds in one project overwrite each other's APK.
   final building = _Turn();
   // The APK of every set of build arguments, built once.
@@ -371,16 +372,24 @@ Future<bool> _run({
           stderr.writeln(failed);
           exit(1);
         }
-        throw StateError(
-          '${errors.length} of $count emulators stopped early:\n'
-          '${errors.join('\n')}',
-        );
+        // The other emulators finished the queue; report what ran first.
+        stoppedEarly =
+            '${errors.length} of $count emulators stopped early:\n'
+            '${errors.join('\n')}';
       }
     }
   } finally {
     progress.close();
   }
   progress.summary(ran, dart: _dart);
+  if (stoppedEarly != null) {
+    stderr.writeln(stoppedEarly);
+    final missing = files.where((f) => !ran.any((r) => r.file == f)).toList();
+    if (missing.isNotEmpty) {
+      stderr.writeln('Not run: ${missing.join(', ')}');
+    }
+    return true;
+  }
   return ran.any((r) => r.failed);
 }
 
