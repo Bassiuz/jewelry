@@ -204,6 +204,21 @@ class AndroidDevice implements Device {
       '0',
       'com.android.vending',
     ]);
+    // The lock screen turns the screen off after a few seconds, and a
+    // screenshot of an off screen is black: scenarios that film the lock
+    // screen would record nothing. KEYCODE_SLEEP still turns it off.
+    await _run(['shell', 'svc', 'power', 'stayon', 'true']);
+    // A wiped emulator has the lock screen switched off: sleep and wake go
+    // straight back to the app. Swipe to unlock, no PIN.
+    await _run(['shell', 'locksettings', 'set-disabled', 'false']);
+    await _run([
+      'shell',
+      'settings',
+      'put',
+      'system',
+      'screen_off_timeout',
+      '1800000',
+    ]);
     // Doze cuts an app's network once the screen is off, which drops the
     // test's own connection. Scenarios lock the phone; they do not test doze.
     await _run(['shell', 'dumpsys', 'deviceidle', 'disable']);

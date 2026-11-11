@@ -43,12 +43,10 @@ class DeviceActions {
   /// A device screenshot without adding it to the recording. Without a
   /// [label] it is not saved under `.jewelry/shots/` either.
   Future<Uint8List> rawScreenshot({String? label, bool shade = false}) async {
-    final result =
-        await _channel.request('screenshot', {
-              'label': ?label,
-              'shade': shade,
-            })
-            as String;
+    final result = await _channel.request('screenshot', {
+      'label': ?label,
+      'shade': shade,
+    }) as String;
     return base64Decode(result);
   }
 
@@ -90,6 +88,15 @@ class DeviceActions {
 
   /// Opens the notification shade and taps the action or notification whose
   /// text matches [text] (case-insensitive). Android only.
-  Future<void> tapNotificationAction(String text) =>
-      _channel.request('tapNotificationAction', {'text': text});
+  ///
+  /// [opensApp]: the tap brings the app to the front (a notification's own
+  /// content, not an action like "Snooze"), so the scenario pumps frames
+  /// again after it.
+  Future<void> tapNotificationAction(
+    String text, {
+    bool opensApp = false,
+  }) async {
+    await _channel.request('tapNotificationAction', {'text': text});
+    if (opensApp) _onBackgroundChanged(false);
+  }
 }
