@@ -70,6 +70,9 @@ ol.steps li:hover{background:#ebe7dd}
 ol.steps li.now{background:#f3ead6}
 ol.steps li.bad{color:var(--bad)} ol.steps li.bad:before{content:"✗ ";color:var(--bad)}
 ol.steps li.off:after{content:" ◷";color:#e8a33c}
+.vwrap{position:relative}
+.vload{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#ddd8cd;font-size:12px;pointer-events:none}
+.vwrap.loading .vload{display:flex}
 .player video{width:300px;display:block;border-radius:8px 8px 0 0;border:1px solid var(--line);background:#111}
 .ctrl{display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .ctrl button{border:0;background:var(--ink);color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:11px}
@@ -202,7 +205,7 @@ function renderDetail(){
 }
 function player(caption,kind,name,prof,r){
   return `<figure class="player" data-kind="${kind}" data-path="${kind}/${name}/${prof}" data-failed="${esc(r&&r.outcome==='failed'?r.step||'':'')}">
-    <div><figcaption>${caption}</figcaption><video muted playsinline preload="auto" src="video/${kind}/${name}/${prof}"></video>
+    <div><figcaption>${caption}</figcaption><div class="vwrap loading"><video muted playsinline preload="auto" src="video/${kind}/${name}/${prof}"></video><div class="vload"><div class="spin"></div><span>Loading the video…</span></div></div>
     <div class="ctrl"><button>▶</button><span class="time">00:00</span></div>
     <div class="track"><div class="head"></div></div><div class="nowstep"></div></div>
     <ol class="steps"></ol></figure>`;
@@ -261,6 +264,10 @@ function setupPlayer(f,tl,mine,theirs,failed){
     now.innerHTML=`${esc(r.step)}${r.kind==='device'?' <span class="counts">(phone screen)</span>':''}`;
     btn.textContent=v.paused?'▶':'❚❚';};
   const loop=()=>{show();if(!v.paused)requestAnimationFrame(loop);};
+  // The first request makes the MP4 on the Mac, so it can take a while; show that it is coming.
+  const wrap=f.querySelector('.vwrap'), loading=on=>wrap.classList.toggle('loading',on);
+  if(v.readyState>=3)loading(false);
+  v.onwaiting=()=>loading(true); v.oncanplay=v.onplaying=()=>loading(false);
   v.onplay=loop; v.onpause=show; v.onseeked=show; v.onloadedmetadata=show; v.onended=show;
   btn.onclick=()=>v.paused?v.play():v.pause();
   v.onclick=btn.onclick;
