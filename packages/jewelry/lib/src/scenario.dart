@@ -116,7 +116,12 @@ void scenario(
             final dir = Directory('${Directory.systemTemp.path}/jewelry')
               ..createSync(recursive: true);
             final base = '${dir.path}/${slug(label)}';
+            final writing = Stopwatch()..start();
             ScenarioRecording(capture.frames).write(base);
+            debugPrint(
+              'jewelry: timing ${capture.timing}, '
+              'writing ${writing.elapsed.inSeconds} s',
+            );
             // ignore: avoid_print
             print('${ScenarioRecording.marker}\t$label\t$base');
             await channel!.close();

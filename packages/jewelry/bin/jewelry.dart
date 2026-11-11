@@ -2,6 +2,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:isolate';
 
 import 'package:args/args.dart';
 import 'package:jewelry/src/accept.dart';
@@ -352,6 +354,7 @@ Future<void> _worker({
   // Its error is reported where it is awaited, after the boot.
   apk?.ignore();
   var booted = false;
+  final judging = <Future<void>>[];
   try {
     if (emulators != null) {
       progress.status(
@@ -418,44 +421,9 @@ Future<void> _worker({
               building: building,
               verbose: verbose,
             );
-      final results = <ScenarioResult>[];
-      ScenarioResult result(
-        String label,
-        Outcome outcome, {
-        String reason = '',
-        String detail = '',
-        String? step,
-        bool acceptable = false,
-        ScenarioRecording? recording,
-      }) => ScenarioResult(
-        label: label,
-        file: file,
-        profile: profile.name,
-        outcome: outcome,
-        duration: watch.elapsed,
-        ranAt: DateTime.now(),
-        reason: reason,
-        detail: detail,
-        step: step,
-        acceptable: acceptable,
-        frames: recording?.frames.length ?? 0,
-        snapshots: recording?.snapshots.length ?? 0,
-        log: run.log,
-      );
-
-      if (run.recorded.isEmpty) {
-        // No scenario got as far as reporting frames: a build failure, a
-        // crash at start or a stall. The file name stands in for it.
-        results.add(
-          result(
-            name,
-            Outcome.failed,
-            reason: run.reason,
-            detail: run.detail,
-            step: run.step,
-          ),
-        );
-      }
+      // Pulled now and judged off the emulator: comparing takes seconds of
+      // CPU on the Mac, and the emulator can run the next scenario meanwhile.
+      final pulled = <String, (Uint8List, String)>{};
       for (final MapEntry(key: label, value: base) in run.recorded.entries) {
         final apng = await device.pull('$base.apng');
         if (apng.length < 8 || apng[0] != 0x89 || apng[1] != 0x50) {
@@ -465,121 +433,49 @@ Future<void> _worker({
             '${utf8.decode(apng.take(200).toList(), allowMalformed: true)}',
           );
         }
-        final actual = ScenarioRecording.decode(
+        pulled[label] = (
           apng,
           utf8.decode(await device.pull('$base.steps.json')),
         );
-        final goldenBase = '.jewelry/goldens/${slug(label)}/${profile.name}';
-        final images = SnapshotGoldens(Directory(goldenBase));
-        // Whatever an earlier run left here is about another recording.
-        final dir = Directory(
-          '.jewelry/failures/${slug(label)}/${profile.name}',
-        );
-        if (dir.existsSync()) dir.deleteSync(recursive: true);
-
-        if (run.exitCode != 0) {
-          // A step failed; keep the frames up to the failure as evidence.
-          dir.createSync(recursive: true);
-          actual.write('${dir.path}/actual');
-          if (actual.frames.isNotEmpty) {
-            File('${dir.path}/actual_frame.png')
-                .writeAsBytesSync(actual.frames.last.png);
-          }
-          results.add(
-            result(
-              label,
-              Outcome.failed,
-              reason: run.reason,
-              detail: run.detail,
-              step: run.step,
-              recording: actual,
-            ),
-          );
-        } else if (record) {
-          Directory(goldenBase).parent.createSync(recursive: true);
-          actual.write(goldenBase);
-          images.record(actual);
-          results.add(result(label, Outcome.recorded, recording: actual));
-        } else if (!File('$goldenBase.apng').existsSync()) {
-          // Kept, so `jewelry accept` can make it the golden.
-          dir.createSync(recursive: true);
-          actual.write('${dir.path}/actual');
-          results.add(
-            result(
-              label,
-              Outcome.failed,
-              reason: 'No golden yet',
-              detail: 'Run with --record, or accept this recording.',
-              acceptable: true,
-              recording: actual,
-            ),
-          );
-        } else {
-          final golden = ScenarioRecording.read(goldenBase);
-          final compared = match == MatchMode.screens
-              ? compareScreens(
-                  golden: golden.frames,
-                  actual: actual.frames,
-                  rest: rest,
-                  tolerance: tolerance,
-                )
-              : compareFrameSequences(
-                  golden: golden.frames,
-                  actual: actual.frames,
-                  drift: drift,
-                  tolerance: tolerance,
-                );
-          final shots = images.compare(actual, tolerance);
-          if (compared is ComparisonPassed && shots.isEmpty) {
-            results.add(result(label, Outcome.passed, recording: actual));
-            continue;
-          }
-          writeFailureReport(
-            dir: dir,
-            scenario: label,
-            profile: profile.name,
-            golden: golden,
-            actual: actual,
-            result: compared,
-            snapshots: shots,
-          );
-          images.writeDiffs(actual, shots, Directory('${dir.path}/snapshots'));
-          results.add(
-            result(
-              label,
-              Outcome.failed,
-              reason: compared is ComparisonPassed
-                  ? '${shots.length} of ${actual.snapshots.length} '
-                        'snapshots differ, the video matches'
-                  : '$compared',
-              detail: shots.join('\n'),
-              step: switch (compared) {
-                PixelMismatch r => r.step,
-                TimingFailure r => r.step,
-                ScreenMismatch r => r.step,
-                ComparisonPassed() => null,
-              },
-              acceptable: true,
-              recording: actual,
-            ),
-          );
-        }
       }
       // Remove what the run left behind (alarms, notifications) before
       // the next scenario, also when nothing was recorded.
       final appPath = run.recorded.values.firstOrNull ?? run.appPath;
       if (appPath != null) await device.clearApp(appPath);
 
-      ran.addAll(results);
-      // After every file, so a run that is stopped halfway still leaves
-      // a report and `--failed` knows what to rerun.
-      log
-        ..replace(file, profile.name, results)
-        ..save();
-      writeHtmlReport(log, dart: _dart);
-      progress.finish(results, worker: worker);
+      final judge = _Judge(
+        file: file,
+        name: name,
+        profile: profile.name,
+        duration: watch.elapsed,
+        record: record,
+        match: match,
+        drift: drift,
+        rest: rest,
+        tolerance: tolerance,
+        exitCode: run.exitCode,
+        reason: run.reason,
+        detail: run.detail,
+        step: run.step,
+        log: run.log,
+        pulled: pulled,
+      );
+      progress.release(worker: worker);
+      judging.add(
+        _judgeInIsolate(judge).then((results) {
+          ran.addAll(results);
+          // After every file, so a run that is stopped halfway still leaves
+          // a report and `--failed` knows what to rerun.
+          log
+            ..replace(file, profile.name, results)
+            ..save();
+          writeHtmlReport(log, dart: _dart);
+          progress.finish(results);
+        }),
+      );
     }
   } finally {
+    await Future.wait(judging);
     progress.status('$who: shutting down');
     if (booted) await device.stopLog();
     // A device that never booted may have nothing to shut down; its boot
@@ -1015,4 +911,192 @@ Future<void> _serveChannel(
     }
   }
   await socket.close();
+}
+
+/// Top level, so the isolate's closure captures [j] and nothing of the
+/// worker (its device and processes cannot be sent).
+Future<List<ScenarioResult>> _judgeInIsolate(_Judge j) =>
+    Isolate.run(() => _judgeRun(j));
+
+/// What [_judgeRun] needs, all sendable to an isolate.
+class _Judge {
+  _Judge({
+    required this.file,
+    required this.name,
+    required this.profile,
+    required this.duration,
+    required this.record,
+    required this.match,
+    required this.drift,
+    required this.rest,
+    required this.tolerance,
+    required this.exitCode,
+    required this.reason,
+    required this.detail,
+    required this.step,
+    required this.log,
+    required this.pulled,
+  });
+
+  final String file;
+  final String name;
+  final String profile;
+  final Duration duration;
+  final bool record;
+  final MatchMode match;
+  final int drift;
+  final int rest;
+  final double tolerance;
+  final int exitCode;
+  final String reason;
+  final String detail;
+  final String? step;
+  final String? log;
+
+  /// Per scenario label: the pulled APNG and its steps JSON.
+  final Map<String, (Uint8List, String)> pulled;
+}
+
+/// Records, or compares against the goldens, what one scenario file
+/// recorded, and writes failure evidence. Runs in its own isolate.
+List<ScenarioResult> _judgeRun(_Judge j) {
+  final results = <ScenarioResult>[];
+  ScenarioResult result(
+    String label,
+    Outcome outcome, {
+    String reason = '',
+    String detail = '',
+    String? step,
+    bool acceptable = false,
+    ScenarioRecording? recording,
+  }) => ScenarioResult(
+    label: label,
+    file: j.file,
+    profile: j.profile,
+    outcome: outcome,
+    duration: j.duration,
+    ranAt: DateTime.now(),
+    reason: reason,
+    detail: detail,
+    step: step,
+    acceptable: acceptable,
+    frames: recording?.frames.length ?? 0,
+    snapshots: recording?.snapshots.length ?? 0,
+    log: j.log,
+  );
+  if (j.pulled.isEmpty) {
+    // No scenario got as far as reporting frames: a build failure, a
+    // crash at start or a stall. The file name stands in for it.
+    return [
+      result(
+        j.name,
+        Outcome.failed,
+        reason: j.reason,
+        detail: j.detail,
+        step: j.step,
+      ),
+    ];
+  }
+  final record = j.record;
+  final match = j.match;
+  final drift = j.drift;
+  final rest = j.rest;
+  final tolerance = j.tolerance;
+  for (final MapEntry(key: label, value: (apng, steps)) in j.pulled.entries) {
+    final actual = ScenarioRecording.decode(apng, steps);
+    final goldenBase = '.jewelry/goldens/${slug(label)}/${j.profile}';
+    final images = SnapshotGoldens(Directory(goldenBase));
+    // Whatever an earlier run left here is about another recording.
+    final dir = Directory('.jewelry/failures/${slug(label)}/${j.profile}');
+    if (dir.existsSync()) dir.deleteSync(recursive: true);
+
+    if (j.exitCode != 0) {
+      // A step failed; keep the frames up to the failure as evidence.
+      dir.createSync(recursive: true);
+      actual.write('${dir.path}/actual');
+      if (actual.frames.isNotEmpty) {
+        File('${dir.path}/actual_frame.png')
+            .writeAsBytesSync(actual.frames.last.png);
+      }
+      results.add(
+        result(
+          label,
+          Outcome.failed,
+          reason: j.reason,
+          detail: j.detail,
+          step: j.step,
+          recording: actual,
+        ),
+      );
+    } else if (record) {
+      Directory(goldenBase).parent.createSync(recursive: true);
+      actual.write(goldenBase);
+      images.record(actual);
+      results.add(result(label, Outcome.recorded, recording: actual));
+    } else if (!File('$goldenBase.apng').existsSync()) {
+      // Kept, so `jewelry accept` can make it the golden.
+      dir.createSync(recursive: true);
+      actual.write('${dir.path}/actual');
+      results.add(
+        result(
+          label,
+          Outcome.failed,
+          reason: 'No golden yet',
+          detail: 'Run with --record, or accept this recording.',
+          acceptable: true,
+          recording: actual,
+        ),
+      );
+    } else {
+      final golden = ScenarioRecording.read(goldenBase);
+      final compared = match == MatchMode.screens
+          ? compareScreens(
+              golden: golden.frames,
+              actual: actual.frames,
+              rest: rest,
+              tolerance: tolerance,
+            )
+          : compareFrameSequences(
+              golden: golden.frames,
+              actual: actual.frames,
+              drift: drift,
+              tolerance: tolerance,
+            );
+      final shots = images.compare(actual, tolerance);
+      if (compared is ComparisonPassed && shots.isEmpty) {
+        results.add(result(label, Outcome.passed, recording: actual));
+        continue;
+      }
+      writeFailureReport(
+        dir: dir,
+        scenario: label,
+        profile: j.profile,
+        golden: golden,
+        actual: actual,
+        result: compared,
+        snapshots: shots,
+      );
+      images.writeDiffs(actual, shots, Directory('${dir.path}/snapshots'));
+      results.add(
+        result(
+          label,
+          Outcome.failed,
+          reason: compared is ComparisonPassed
+              ? '${shots.length} of ${actual.snapshots.length} '
+                    'snapshots differ, the video matches'
+              : '$compared',
+          detail: shots.join('\n'),
+          step: switch (compared) {
+            PixelMismatch r => r.step,
+            TimingFailure r => r.step,
+            ScreenMismatch r => r.step,
+            ComparisonPassed() => null,
+          },
+          acceptable: true,
+          recording: actual,
+        ),
+      );
+    }
+  }
+  return results;
 }

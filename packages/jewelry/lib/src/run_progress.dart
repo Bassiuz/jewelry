@@ -110,9 +110,16 @@ class RunProgress {
   }
 
   /// The scenario file on emulator [worker] is done, with these results.
-  void finish(List<ScenarioResult> results, {int worker = 0}) {
-    _done++;
+  /// Emulator [worker] is free for the next file; its results follow
+  /// through [finish].
+  void release({int worker = 0}) {
     _running.remove(worker);
+    _steps.remove(worker);
+  }
+
+  void finish(List<ScenarioResult> results, {int? worker}) {
+    _done++;
+    if (worker != null) _running.remove(worker);
     for (final r in results) {
       r.failed ? _failed++ : _passed++;
       final time = clock(r.duration);

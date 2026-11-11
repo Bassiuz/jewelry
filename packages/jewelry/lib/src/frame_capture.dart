@@ -16,6 +16,33 @@ class FrameCapture {
   /// Label stamped on every frame captured from now on.
   String currentStep = 'given';
 
+  Uint8List? _previousRaw;
+  var _reused = 0;
+
+  static bool _same(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return false;
+    // Compared as 64-bit words: a frame is a few megabytes.
+    final wa = a.buffer.asUint64List(a.offsetInBytes, a.length ~/ 8);
+    final wb = b.buffer.asUint64List(b.offsetInBytes, b.length ~/ 8);
+    for (var i = 0; i < wa.length; i++) {
+      if (wa[i] != wb[i]) return false;
+    }
+    for (var i = wa.length * 8; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  final _render = Stopwatch();
+  final _encode = Stopwatch();
+  final _total = Stopwatch()..start();
+
+  /// Where the scenario's time went, for the log.
+  String get timing =>
+      '${frames.length} frames in ${_total.elapsed.inSeconds} s: '
+      'drawing ${_render.elapsed.inSeconds} s, encoding ${_encode.elapsed.inSeconds} s '
+      '($_reused frames repeated the one before)';
+
   /// While true, captured frames are wait frames ([CapturedFrame.wait]).
   bool waiting = false;
 
@@ -55,6 +82,7 @@ class FrameCapture {
       return bytes!.buffer.asUint8List();
     });
     frames.add(CapturedFrame(step: currentStep, png: png!, device: true));
+    _previousRaw = null; // the next app frame must not reuse this one
     // Device frames are never compared; no wait flag needed.
   }
 
@@ -77,17 +105,35 @@ class FrameCapture {
       (bounds.width / dpr).floorToDouble() * dpr,
       (bounds.height / dpr).floorToDouble() * dpr,
     );
+    _render.start();
     final image = await _tester.runAsync(
       () => layer.toImage(whole, pixelRatio: 1 / dpr),
     );
-    final bytes = await _tester.runAsync(
-      () => image!.toByteData(format: ui.ImageByteFormat.png),
-    );
+    _render.stop();
+    _encode.start();
+    // Most frames repeat the one before (pauses, settles): reading raw
+    // pixels is cheap, encoding a PNG is not, so encode only what changed.
+    final raw = (await _tester.runAsync(
+      () => image!.toByteData(format: ui.ImageByteFormat.rawRgba),
+    ))!.buffer.asUint8List();
+    final Uint8List png;
+    final previous = _previousRaw;
+    if (previous != null && frames.isNotEmpty && _same(previous, raw)) {
+      png = frames.last.png;
+      _reused++;
+    } else {
+      final bytes = await _tester.runAsync(
+        () => image!.toByteData(format: ui.ImageByteFormat.png),
+      );
+      png = bytes!.buffer.asUint8List();
+    }
+    _previousRaw = raw;
+    _encode.stop();
     image!.dispose();
     frames.add(
       CapturedFrame(
         step: currentStep,
-        png: bytes!.buffer.asUint8List(),
+        png: png,
         snapshot: snapshot,
         wait: waiting && snapshot == null,
       ),
