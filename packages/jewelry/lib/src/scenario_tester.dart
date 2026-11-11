@@ -60,6 +60,16 @@ class ScenarioTester {
     Duration duration, {
     Duration every = const Duration(seconds: 1),
   }) async {
+    final begin = DateTime.now();
+    try {
+      await _wait(duration, every);
+    } finally {
+      // The app's clock counts it as passed (see JewelryBinding.appClock).
+      JewelryBinding.waited += DateTime.now().difference(begin);
+    }
+  }
+
+  Future<void> _wait(Duration duration, Duration every) async {
     final end = DateTime.now().add(duration);
     if (!_backgrounded || _channel == null) {
       if (duration > Duration.zero) await Future<void>.delayed(duration);

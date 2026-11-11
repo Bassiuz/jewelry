@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'dart:ui' show ViewPadding;
 
+import 'package:clock/clock.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -42,90 +43,96 @@ void scenario(
   List<Pattern> ignoreErrors = const [],
   Duration pauseAfterStep = const Duration(seconds: 1),
 }) {
-  testWidgets(label, (tester) => _guarded(label, ignoreErrors, () async {
-    // Started from the launcher, the test can begin before Android has
-    // given the app a surface; there is nothing to capture until it has.
-    while (JewelryBinding.isActive && tester.view.physicalSize.isEmpty) {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    }
-    if (JewelryBinding.isActive && Platform.isAndroid) _pinTopInset(tester);
-    final ctx = ScenarioContext(tester);
-    await given?.call(ctx);
-
-    // The cursor blinks on a wall-clock timer; keep it solid.
-    EditableText.debugDeterministicCursor = true;
-    addTearDown(() => EditableText.debugDeterministicCursor = false);
-    // Typing goes straight to the fields instead of through the platform
-    // keyboard, which slides in and resizes the app on the system clock.
-    if (!tester.testTextInput.isRegistered) {
-      tester.testTextInput.register();
-      addTearDown(tester.testTextInput.unregister);
-    }
-    final capture = FrameCapture(tester);
-    final channel = JewelryBinding.isActive
-        ? await HostChannel.open(label)
-        : null;
-    final t = ScenarioTester(
-      tester,
-      capture,
-      channel: channel,
-      ignoreErrors: ignoreErrors,
-    );
-
-    t.keepErrorsVisible();
-    capture.currentStep = 'launch';
-    // App start depends on I/O (Firebase, network); its frames are shown,
-    // not compared.
-    capture.waiting = true;
-    await launch(ctx);
-    await capture.capture();
-    await t.settle();
-    capture.waiting = false;
-
-    try {
-      for (final s in steps) {
-        capture.currentStep = s.label;
-        // Lands in the flutter test output and the device log, so a run that
-        // dies mid-scenario shows which step it was in.
-        debugPrint('jewelry: step "${s.label}"');
-        try {
-          await s.run(t);
-          // Leaves each step's result on screen in the recording; the last
-          // one is the scenario's final screen.
-          await t.hold(pauseAfterStep);
-        } catch (e, stack) {
-          // Printed here because the app may have pointed FlutterError.onError
-          // at its crash reporter, which then swallows the test's own report.
-          debugPrint('jewelry: step "${s.label}" failed: $e\n$stack');
-          rethrow;
+  testWidgets(label, (tester) {
+    JewelryBinding.startAppClock();
+    return withClock(
+      JewelryBinding.appClock,
+      () => _guarded(label, ignoreErrors, () async {
+        // Started from the launcher, the test can begin before Android has
+        // given the app a surface; there is nothing to capture until it has.
+        while (JewelryBinding.isActive && tester.view.physicalSize.isEmpty) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
         }
-      }
-    } finally {
-      // Written even when a step failed: the CLI keeps a failed run's frames
-      // under .jewelry/failures as actual.apng, which shows where it got.
-      capturedScenarios[label] = capture.frames;
-      if (JewelryBinding.isActive) {
-        // ponytail: whole recording held in memory, then one APNG in the
-        // app's temp dir. Stream frames to disk if long scenarios run out of
-        // RAM.
-        final dir = Directory('${Directory.systemTemp.path}/jewelry')
-          ..createSync(recursive: true);
-        final base = '${dir.path}/${slug(label)}';
-        ScenarioRecording(capture.frames).write(base);
-        // ignore: avoid_print
-        print('${ScenarioRecording.marker}\t$label\t$base');
-        await channel!.close();
-      }
-    }
-    // The scenario is complete once the last step ran; the recording holds
-    // every frame. flutter_test then unmounts the whole app, which production
-    // never does, and errors raised there (double disposes, for instance)
-    // would fail the scenario and lose the recording. Log them instead.
-    FlutterError.onError = (details) => debugPrint(
-      'jewelry: error after the last step, ignored: '
-      '${details.exceptionAsString()}',
+        if (JewelryBinding.isActive && Platform.isAndroid) _pinTopInset(tester);
+        final ctx = ScenarioContext(tester);
+        await given?.call(ctx);
+
+        // The cursor blinks on a wall-clock timer; keep it solid.
+        EditableText.debugDeterministicCursor = true;
+        addTearDown(() => EditableText.debugDeterministicCursor = false);
+        // Typing goes straight to the fields instead of through the platform
+        // keyboard, which slides in and resizes the app on the system clock.
+        if (!tester.testTextInput.isRegistered) {
+          tester.testTextInput.register();
+          addTearDown(tester.testTextInput.unregister);
+        }
+        final capture = FrameCapture(tester);
+        final channel = JewelryBinding.isActive
+            ? await HostChannel.open(label)
+            : null;
+        final t = ScenarioTester(
+          tester,
+          capture,
+          channel: channel,
+          ignoreErrors: ignoreErrors,
+        );
+
+        t.keepErrorsVisible();
+        capture.currentStep = 'launch';
+        // App start depends on I/O (Firebase, network); its frames are shown,
+        // not compared.
+        capture.waiting = true;
+        await launch(ctx);
+        await capture.capture();
+        await t.settle();
+        capture.waiting = false;
+
+        try {
+          for (final s in steps) {
+            capture.currentStep = s.label;
+            // Lands in the flutter test output and the device log, so a run that
+            // dies mid-scenario shows which step it was in.
+            debugPrint('jewelry: step "${s.label}"');
+            try {
+              await s.run(t);
+              // Leaves each step's result on screen in the recording; the last
+              // one is the scenario's final screen.
+              await t.hold(pauseAfterStep);
+            } catch (e, stack) {
+              // Printed here because the app may have pointed FlutterError.onError
+              // at its crash reporter, which then swallows the test's own report.
+              debugPrint('jewelry: step "${s.label}" failed: $e\n$stack');
+              rethrow;
+            }
+          }
+        } finally {
+          // Written even when a step failed: the CLI keeps a failed run's frames
+          // under .jewelry/failures as actual.apng, which shows where it got.
+          capturedScenarios[label] = capture.frames;
+          if (JewelryBinding.isActive) {
+            // ponytail: whole recording held in memory, then one APNG in the
+            // app's temp dir. Stream frames to disk if long scenarios run out of
+            // RAM.
+            final dir = Directory('${Directory.systemTemp.path}/jewelry')
+              ..createSync(recursive: true);
+            final base = '${dir.path}/${slug(label)}';
+            ScenarioRecording(capture.frames).write(base);
+            // ignore: avoid_print
+            print('${ScenarioRecording.marker}\t$label\t$base');
+            await channel!.close();
+          }
+        }
+        // The scenario is complete once the last step ran; the recording holds
+        // every frame. flutter_test then unmounts the whole app, which production
+        // never does, and errors raised there (double disposes, for instance)
+        // would fail the scenario and lose the recording. Log them instead.
+        FlutterError.onError = (details) => debugPrint(
+          'jewelry: error after the last step, ignored: '
+          '${details.exceptionAsString()}',
+        );
+      }),
     );
-  }));
+  });
 }
 
 /// Runs a scenario body in its own error zone, so an uncaught async error
@@ -175,12 +182,8 @@ Future<void> _guarded(
 void _pinTopInset(WidgetTester tester) {
   final view = tester.view;
   final top = 24 * view.devicePixelRatio;
-  FakeViewPadding pinned(ViewPadding p) => FakeViewPadding(
-    left: p.left,
-    top: top,
-    right: p.right,
-    bottom: p.bottom,
-  );
+  FakeViewPadding pinned(ViewPadding p) =>
+      FakeViewPadding(left: p.left, top: top, right: p.right, bottom: p.bottom);
   view.padding = pinned(view.padding);
   view.viewPadding = pinned(view.viewPadding);
 }
