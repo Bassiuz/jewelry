@@ -31,9 +31,9 @@ main{overflow:auto;padding:18px 22px}
 main h2{font-size:16px;margin:0 0 14px;display:flex;gap:12px;align-items:baseline}
 main h2 a{font-size:13px;font-weight:normal;color:var(--rec);cursor:pointer}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;gap:14px;align-items:flex-start}
 .screen{position:relative;width:180px;aspect-ratio:1344/2992;flex:none}
-.screen img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px;opacity:0;transition:opacity .4s}
+.screen img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:10px;opacity:0;transition:opacity .4s}
 .screen.on img{opacity:1}
 .loader{position:absolute;inset:0;border-radius:18px;border:2px solid #d9d4c8;padding:14px;display:flex;flex-direction:column;
 align-items:center;justify-content:center;gap:10px;text-align:center;color:var(--dim);font-size:12px;
