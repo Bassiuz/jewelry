@@ -74,6 +74,11 @@ Future<void> main(List<String> argv) async {
       help: 'Serve a live dashboard of the run on localhost',
     )
     ..addOption('dashboard-port', help: 'Port of the dashboard (4848)')
+    ..addFlag(
+      'open',
+      defaultsTo: true,
+      help: 'jewelry dashboard: open it in the browser',
+    )
     ..addOption('parallel', help: 'Emulators at once')
     ..addOption('profile', help: 'Only this profile')
     ..addOption('match', allowed: ['frames', 'screens'])
@@ -156,7 +161,9 @@ Future<void> main(List<String> argv) async {
         'jewelry: dashboard of the last run at ${dashboard.url} '
         '(${log.results.length} scenarios). Ctrl-C stops it.',
       );
-      if (Platform.isMacOS) await Process.run('open', ['${dashboard.url}']);
+      if (args['open'] as bool && Platform.isMacOS) {
+        await Process.run('open', ['${dashboard.url}']);
+      }
       await ProcessSignal.sigint.watch().first;
       await dashboard.stop();
       exit(0);
