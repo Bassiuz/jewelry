@@ -30,4 +30,15 @@ void main() {
     },
     skip: Process.runSync('which', ['ffmpeg']).exitCode != 0 ? 'no ffmpeg' : false,
   );
+
+  test('the timeline puts each step where the video shows it', () {
+    final tl = videoTimeline(
+      '[{"step":"a","frames":60},{"step":"b","frames":10,"device":true},'
+      '{"step":"b","frames":1,"snapshot":"Home"}]',
+    );
+    expect(tl.map((r) => r['kind']), ['app', 'device', 'app']);
+    expect(tl[1]['start'], closeTo(1.0, 0.001));
+    expect(tl[1]['end'], closeTo(2.0, 0.001));
+    expect(tl[2]['snapshot'], 'Home');
+  });
 }

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'captured_frame.dart';
 import 'scenario_recording.dart';
@@ -78,4 +80,36 @@ bool _same(List<int> a, List<int> b) {
     if (a[i] != b[i]) return false;
   }
   return true;
+}
+
+/// Where each step sits in the video [writeVideo] makes of a recording,
+/// from its steps file: one entry per run of frames, in seconds, with what
+/// kind of frames they are (`app`, `wait` for frames that are not
+/// compared, `device` for phone screenshots) and a snapshot's name.
+List<Map<String, Object?>> videoTimeline(String stepsJson) {
+  final out = <Map<String, Object?>>[];
+  var at = Duration.zero;
+  for (final run
+      in (jsonDecode(stepsJson) as List).cast<Map<String, dynamic>>()) {
+    final frames = run['frames'] as int;
+    final device = run['device'] == true;
+    final length =
+        videoDuration(
+          CapturedFrame(step: '', png: Uint8List(0), device: device),
+        ) *
+        frames;
+    out.add({
+      'step': run['step'],
+      'start': at.inMicroseconds / 1e6,
+      'end': (at + length).inMicroseconds / 1e6,
+      'kind': device
+          ? 'device'
+          : run['wait'] == true
+          ? 'wait'
+          : 'app',
+      if (run['snapshot'] != null) 'snapshot': run['snapshot'],
+    });
+    at += length;
+  }
+  return out;
 }

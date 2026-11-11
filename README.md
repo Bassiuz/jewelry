@@ -80,6 +80,8 @@ Each finished scenario gets one line. The run ends with a summary that lists eve
 
 `jewelry run` serves a live dashboard at http://localhost:4848/ while it runs: every scenario with its state on the left, every emulator's screen with the scenario's steps (done, now, still to come) on the right. Click a scenario for its golden as a video, or a failure's recording, reason and difference images. `--no-dashboard` turns it off, `--dashboard-port` moves it.
 
+`jewelry dashboard` opens the same page for the last run without running anything: every result, failed ones first. Each recording plays with a bar you can drag, split into the scenario's steps: the step that failed is red, a step that took a clearly different time than in the other recording is orange, phone screens are marked blue, frames that are not compared are hatched, and snapshots are white ticks. The page's address keeps the selected scenario, so a result can be linked.
+
 `jewelry video <scenario>` writes `.jewelry/videos/<scenario>.<profile>.mp4`: an H.264 video of the golden, a few hundred kilobytes where the APNG is tens of megabytes, that plays in Slack or a browser. The name is a folder under `.jewelry/goldens`, or a unique part of one. App frames keep their 60 Hz timing; phone frames (lock screen, home screen), taken about once a second while the scenario waited, show for a tenth of a second each.
 
 ### Defaults in `jewelry.yaml`

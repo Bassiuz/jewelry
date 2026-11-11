@@ -47,6 +47,21 @@ ol li.next:before{content:"○ ";color:var(--line)}
 .media figure{margin:0} .media figcaption{color:var(--dim);font-size:12px;margin-bottom:4px}
 .media video,.media img{width:260px;border-radius:8px;border:1px solid var(--line);background:#111}
 .empty{color:var(--dim)}
+.player{width:300px}
+.player video{width:300px;display:block;border-radius:8px 8px 0 0;border:1px solid var(--line);background:#111}
+.ctrl{display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.ctrl button{border:0;background:var(--ink);color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:11px}
+.track{position:relative;height:18px;border-radius:4px;overflow:hidden;background:var(--line);cursor:pointer;touch-action:none}
+.band{position:absolute;top:0;bottom:0;border-right:1px solid #fff8}
+.band.a{background:#d9d4c8}.band.b{background:#cbc5b7}
+.band.off{background:#e8a33c}.band.bad{background:var(--bad)}
+.seg{position:absolute;bottom:0;height:5px}
+.seg.device{background:#3d6fb6}.seg.wait{background:repeating-linear-gradient(45deg,#0003 0 3px,transparent 3px 6px);height:100%}
+.tick{position:absolute;top:0;width:2px;height:7px;background:#fff}
+.head{position:absolute;top:-2px;bottom:-2px;width:3px;margin-left:-1px;background:var(--ink);border-radius:2px;pointer-events:none}
+.nowstep{font-size:12px;margin-top:5px;min-height:1.4em}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:4px 0 10px}
+.legend i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 </style></head><body>
 <aside><header><h1>jewelry</h1><div class="counts" id="counts"></div><div class="bar"><i id="bar"></i></div></header>
 <ul id="tests"></ul></aside>
@@ -74,7 +89,8 @@ function render(){
   }).join('');
   selected?renderDetail():renderLive();
 }
-$('#tests').onclick=e=>{const li=e.target.closest('li');if(!li)return;selected=li.dataset.key;render();};
+$('#tests').onclick=e=>{const li=e.target.closest('li');if(!li)return;selected=li.dataset.key;location.hash=encodeURIComponent(selected);render();};
+if(location.hash.length>1)selected=decodeURIComponent(location.hash.slice(1));
 
 function renderLive(){
   const ws=state.workers;
@@ -115,18 +131,85 @@ function renderDetail(){
   for(const s of slugs){
     const name=encodeURIComponent(s);
     const r=x.results.find(r=>r.slug===s);
-    html+=`<figure><figcaption>Golden</figcaption><video controls muted playsinline src="video/golden/${name}/${prof}" onerror="this.parentNode.remove()"></video></figure>`;
+    html+=player('Golden','golden',name,prof,r);
     if(r&&r.failureDir){
-      html+=`<figure><figcaption>This run</figcaption><video controls muted playsinline src="video/failure/${name}/${prof}" onerror="this.parentNode.remove()"></video></figure>`;
+      html+=player('This run','failure',name,prof,r);
       for(const [f,c] of [['expected_frame.png','Expected'],['actual_frame.png','Actual'],['diff.png','Difference']])
         html+=`<figure><figcaption>${c}</figcaption><img src="files/${r.failureDir}/${f}" onerror="this.parentNode.remove()"></figure>`;
     }
   }
   html+='</div>';
   if(x.state==='queued'||x.state==='running')html+='<p class="empty">Not finished yet: the golden plays above when there is one.</p>';
+  html+=`<div class="legend"><span><i style="background:var(--bad)"></i>step that failed</span>
+    <span><i style="background:#e8a33c"></i>step took a different time than in the golden</span>
+    <span><i style="background:#3d6fb6"></i>phone screen (outside the app)</span>
+    <span><i style="background:repeating-linear-gradient(45deg,#0004 0 3px,#d9d4c8 3px 6px)"></i>waiting, not compared</span>
+    <span><i style="background:#fff;border:1px solid var(--line)"></i>snapshot</span></div>`;
   html+='<p><a href="files/report.html" target="_blank">Full report</a></p></div>';
   $('#main').innerHTML=html;
-  $('#back').onclick=()=>{selected=null;$('#main').innerHTML='';$('#main').dataset.shown='';render();};
+  initPlayers(x);
+  $('#back').onclick=()=>{selected=null;history.replaceState(null,'',location.pathname);$('#main').innerHTML='';$('#main').dataset.shown='';render();};
+}
+function player(caption,kind,name,prof,r){
+  return `<figure class="player" data-kind="${kind}" data-path="${kind}/${name}/${prof}" data-failed="${esc(r&&r.outcome==='failed'?r.step||'':'')}">
+    <figcaption>${caption}</figcaption><video muted playsinline preload="auto" src="video/${kind}/${name}/${prof}"></video>
+    <div class="ctrl"><button>▶</button><span class="time">00:00</span></div>
+    <div class="track"><div class="head"></div></div><div class="nowstep"></div></figure>`;
+}
+// Seconds per step in a timeline.
+const perStep=tl=>tl.reduce((m,r)=>(m[r.step]=(m[r.step]||0)+r.end-r.start,m),{});
+async function initPlayers(x){
+  const figs=[...document.querySelectorAll('.player')];
+  const tls={};
+  await Promise.all(figs.map(async f=>{
+    try{tls[f.dataset.path]=await (await fetch('timeline/'+f.dataset.path)).json();}
+    catch(e){f.remove();}
+  }));
+  for(const f of figs){
+    const tl=tls[f.dataset.path]; if(!tl||!tl.length)continue;
+    // The other recording of the same scenario, to see which steps took longer.
+    const other=Object.entries(tls).find(([k])=>k!==f.dataset.path&&k.split('/')[1]===f.dataset.path.split('/')[1]);
+    const mine=perStep(tl), theirs=other?perStep(other[1]):null;
+    setupPlayer(f,tl,mine,theirs,f.dataset.failed);
+  }
+}
+function setupPlayer(f,tl,mine,theirs,failed){
+  const v=f.querySelector('video'), track=f.querySelector('.track'), head=f.querySelector('.head');
+  const btn=f.querySelector('button'), time=f.querySelector('.time'), now=f.querySelector('.nowstep');
+  v.onerror=()=>f.remove();
+  const total=tl[tl.length-1].end;
+  // Step bands: consecutive runs of one step.
+  const bands=[];
+  for(const r of tl){const b=bands[bands.length-1]; if(b&&b.step===r.step)b.end=r.end; else bands.push({step:r.step,start:r.start,end:r.end});}
+  let html='';
+  bands.forEach((b,i)=>{
+    const a=mine[b.step], t=theirs?theirs[b.step]:null;
+    const off=theirs&&(t===undefined||Math.abs(a-t)>Math.max(0.5,0.25*Math.max(a,t)));
+    const cls=b.step===failed?'bad':off?'off':(i%2?'b':'a');
+    const why=theirs?` · ${a.toFixed(1)} s here, ${t===undefined?'missing':t.toFixed(1)+' s'} in the other`:` · ${(b.end-b.start).toFixed(1)} s`;
+    html+=`<div class="band ${cls}" style="left:${100*b.start/total}%;width:${100*(b.end-b.start)/total}%" title="${esc(b.step+why)}"></div>`;
+  });
+  for(const r of tl){
+    if(r.kind!=='app')html+=`<div class="seg ${r.kind}" style="left:${100*r.start/total}%;width:${100*(r.end-r.start)/total}%"></div>`;
+    if(r.snapshot)html+=`<div class="tick" style="left:${100*r.start/total}%" title="snapshot: ${esc(r.snapshot)}"></div>`;
+  }
+  track.insertAdjacentHTML('afterbegin',html);
+  // The video's own length can differ from the timeline by a frame or two.
+  const toVideo=s=>v.duration?s*v.duration/total:s, toTimeline=s=>v.duration?s*total/v.duration:s;
+  const show=()=>{const s=toTimeline(v.currentTime);head.style.left=(100*s/total)+'%';
+    time.textContent=`${clock(v.currentTime*1000)} / ${clock((v.duration||total)*1000)}`;
+    const r=tl.find(r=>s>=r.start&&s<r.end)||tl[tl.length-1];
+    now.innerHTML=`${esc(r.step)}${r.kind==='device'?' <span class="counts">(phone screen)</span>':''}`;
+    btn.textContent=v.paused?'▶':'❚❚';};
+  const loop=()=>{show();if(!v.paused)requestAnimationFrame(loop);};
+  v.onplay=loop; v.onpause=show; v.onseeked=show; v.onloadedmetadata=show; v.onended=show;
+  btn.onclick=()=>v.paused?v.play():v.pause();
+  v.onclick=btn.onclick;
+  const seek=e=>{const box=track.getBoundingClientRect();const frac=Math.min(1,Math.max(0,(e.clientX-box.left)/box.width));
+    v.currentTime=toVideo(frac*total);show();};
+  track.onpointerdown=e=>{track.setPointerCapture(e.pointerId);seek(e);track.onpointermove=seek;};
+  track.onpointerup=e=>{track.onpointermove=null;};
+  show();
 }
 poll();
 </script></body></html>''';

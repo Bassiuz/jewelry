@@ -142,6 +142,24 @@ Future<void> main(List<String> argv) async {
         );
       }
       exit(refused.isEmpty ? 0 : 1);
+    case 'dashboard':
+      // The last runs' results, without running anything.
+      if (log.results.isEmpty) {
+        print('Nothing to show yet: run jewelry run first.');
+        exit(2);
+      }
+      final dashboard = Dashboard(root: Directory('.jewelry'))..showLog(log);
+      await dashboard.start(
+        port: int.tryParse(args['dashboard-port'] ?? '') ?? 4848,
+      );
+      print(
+        'jewelry: dashboard of the last run at ${dashboard.url} '
+        '(${log.results.length} scenarios). Ctrl-C stops it.',
+      );
+      if (Platform.isMacOS) await Process.run('open', ['${dashboard.url}']);
+      await ProcessSignal.sigint.watch().first;
+      await dashboard.stop();
+      exit(0);
     case 'video':
       // jewelry video <scenario>...: the golden of each, as an MP4 to share.
       final wantedNames = args.rest.sublist(1);

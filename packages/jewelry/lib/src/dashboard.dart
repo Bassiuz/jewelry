@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'dashboard_page.dart';
 import 'device/device.dart';
+import 'run_log.dart';
 import 'scenario_recording.dart';
 import 'scenario_result.dart';
 import 'slug.dart';
@@ -110,6 +111,26 @@ class Dashboard {
     }
   }
 
+  /// Shows what [log] holds, the results of the last runs, as finished
+  /// scenarios: for `jewelry dashboard`, which runs nothing. Failed first.
+  void showLog(RunLog log) {
+    final byFile = <String, List<ScenarioResult>>{};
+    for (final r in log.results) {
+      byFile.putIfAbsent(_key(r.profile, r.file), () => []).add(r);
+    }
+    final ordered = byFile.values.toList()
+      ..sort((a, b) {
+        final failed =
+            (b.any((r) => r.failed) ? 1 : 0) - (a.any((r) => r.failed) ? 1 : 0);
+        return failed != 0 ? failed : a.first.label.compareTo(b.first.label);
+      });
+    for (final results in ordered) {
+      final r = results.first;
+      queue(r.profile, [r.file]);
+      finished(r.profile, r.file, results);
+    }
+  }
+
   _Worker _worker(String profile, int worker) => _workers.putIfAbsent(
     _workerKey(profile, worker),
     () => _Worker(profile, worker),
@@ -175,7 +196,9 @@ class Dashboard {
       } else if (path.startsWith('/screen/')) {
         await _screen(Uri.decodeComponent(path.substring(8)), res);
       } else if (path.startsWith('/video/')) {
-        await _video(path.substring(7).split('/'), res);
+        await _video(path.substring(7).split('/'), request);
+      } else if (path.startsWith('/timeline/')) {
+        await _timeline(path.substring(10).split('/'), res);
       } else if (path.startsWith('/files/')) {
         await _file(Uri.decodeComponent(path.substring(7)), res);
       } else {
@@ -223,31 +246,80 @@ class Dashboard {
     res.add(w.last!);
   }
 
-  /// `/video/golden/<slug>/<profile>` or `/video/failure/<slug>/<profile>`:
-  /// that recording as an MP4, made once and kept until it changes.
-  Future<void> _video(List<String> parts, HttpResponse res) async {
-    if (parts.length != 3 || parts.any((p) => p.contains('..'))) {
-      res.statusCode = HttpStatus.badRequest;
-      return;
-    }
+  /// The recording behind `<kind>/<slug>/<profile>`: `golden` or `failure`
+  /// (this run's recording of a failed scenario). Null for a bad request.
+  String? _recording(List<String> parts) {
+    if (parts.length != 3 || parts.any((p) => p.contains('..'))) return null;
     final [kind, name, profile] = parts;
-    final base = switch (kind) {
+    return switch (kind) {
       'golden' => '${root.path}/goldens/$name/$profile',
       'failure' => '${root.path}/failures/$name/$profile/actual',
       _ => null,
     };
+  }
+
+  /// `/video/<kind>/<slug>/<profile>`: that recording as an MP4, made once
+  /// and kept until the recording changes. Answers range requests, which a
+  /// browser needs to seek.
+  Future<void> _video(List<String> parts, HttpRequest request) async {
+    final res = request.response;
+    final base = _recording(parts);
     if (base == null || !File('$base.apng').existsSync()) {
       res.statusCode = HttpStatus.notFound;
       return;
     }
-    final out = File('${root.path}/videos/dashboard/$kind.$name.$profile.mp4');
+    final out = File('${root.path}/videos/dashboard/${parts.join('.')}.mp4');
     final source = File('$base.apng').lastModifiedSync();
     if (!out.existsSync() || out.lastModifiedSync().isBefore(source)) {
       // Decoding a recording takes seconds of CPU; keep the server free.
       await _videoInIsolate(base, out);
     }
-    res.headers.contentType = ContentType('video', 'mp4');
-    await res.addStream(out.openRead());
+    await _send(out, request, ContentType('video', 'mp4'));
+  }
+
+  /// `/timeline/<kind>/<slug>/<profile>`: where each step sits in that
+  /// recording's video ([videoTimeline]).
+  Future<void> _timeline(List<String> parts, HttpResponse res) async {
+    final base = _recording(parts);
+    final steps = File('$base.steps.json');
+    if (base == null || !steps.existsSync()) {
+      res.statusCode = HttpStatus.notFound;
+      return;
+    }
+    res.headers.contentType = ContentType.json;
+    res.write(jsonEncode(videoTimeline(steps.readAsStringSync())));
+  }
+
+  /// [file], or the byte range the request asks for.
+  static Future<void> _send(
+    File file,
+    HttpRequest request,
+    ContentType type,
+  ) async {
+    final res = request.response;
+    final length = file.lengthSync();
+    res.headers
+      ..contentType = type
+      ..set('accept-ranges', 'bytes');
+    final range = RegExp(r'bytes=(\d*)-(\d*)')
+        .firstMatch(request.headers.value('range') ?? '');
+    if (range == null) {
+      res.contentLength = length;
+      await res.addStream(file.openRead());
+      return;
+    }
+    final start = int.tryParse(range.group(1)!) ?? 0;
+    final end = int.tryParse(range.group(2)!) ?? length - 1;
+    if (start >= length || end < start) {
+      res.statusCode = HttpStatus.requestedRangeNotSatisfiable;
+      return;
+    }
+    final last = end < length ? end : length - 1;
+    res
+      ..statusCode = HttpStatus.partialContent
+      ..contentLength = last - start + 1;
+    res.headers.set('content-range', 'bytes $start-$last/$length');
+    await res.addStream(file.openRead(start, last + 1));
   }
 
   /// Files under [root] (diff images, logs), for the result view.
