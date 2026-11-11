@@ -244,7 +244,7 @@ Future<bool> _run({
 
   try {
     for (final profile in profiles) {
-      final queue = [...files];
+      final queue = log.longestFirst(files, profile.name);
       final count = workersFor(profile);
       // A worker that dies (its emulator did not boot) leaves its share of
       // the queue to the others; the error is shown once they are done.

@@ -38,6 +38,15 @@ class RunLog {
       .map((r) => r.duration)
       .firstOrNull;
 
+  /// [files] with the slowest of the last run first, files without a
+  /// duration before those: a long scenario that starts last keeps one
+  /// emulator busy while the others are done.
+  List<String> longestFirst(List<String> files, String profile) {
+    int ms(String f) =>
+        lastDuration(f, profile)?.inMilliseconds ?? 1 << 40;
+    return [...files]..sort((a, b) => ms(b).compareTo(ms(a)));
+  }
+
   void save() => File('${dir.path}/last_run.json').writeAsStringSync(
     const JsonEncoder.withIndent(' ').convert(results),
   );
