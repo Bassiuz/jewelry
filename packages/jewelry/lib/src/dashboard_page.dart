@@ -32,7 +32,18 @@ main h2{font-size:16px;margin:0 0 14px;display:flex;gap:12px;align-items:baselin
 main h2 a{font-size:13px;font-weight:normal;color:var(--rec);cursor:pointer}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;gap:14px}
-.card img{width:180px;aspect-ratio:1344/2992;object-fit:cover;border-radius:8px;background:#111;flex:none}
+.screen{position:relative;width:180px;aspect-ratio:1344/2992;flex:none}
+.screen img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px;opacity:0;transition:opacity .4s}
+.screen.on img{opacity:1}
+.loader{position:absolute;inset:0;border-radius:18px;border:2px solid #d9d4c8;padding:14px;display:flex;flex-direction:column;
+align-items:center;justify-content:center;gap:10px;text-align:center;color:var(--dim);font-size:12px;
+background:linear-gradient(110deg,#efece5 35%,#faf8f4 50%,#efece5 65%);background-size:250% 100%;animation:shimmer 1.8s linear infinite}
+.loader:before{content:"";position:absolute;top:9px;left:50%;width:34px;height:6px;margin-left:-17px;border-radius:3px;background:#d9d4c8}
+.loader b{color:var(--ink);font-size:13px}
+.spin{width:30px;height:30px;border-radius:50%;border:3px solid #ddd8cd;border-top-color:var(--run);animation:spin .9s linear infinite}
+.screen.on .loader{display:none}
+.card.stopped .loader{animation:none;background:#efece5}.card.stopped .spin{border-top-color:#ddd8cd;animation:none}
+@keyframes shimmer{to{background-position:-250% 0}}@keyframes spin{to{transform:rotate(360deg)}}
 .card .info{flex:1;min-width:0}
 .card .who{color:var(--dim);font-size:12px}
 .card .test{font-weight:600;margin:2px 0 8px}
@@ -47,7 +58,14 @@ ol li.next:before{content:"○ ";color:var(--line)}
 .media figure{margin:0} .media figcaption{color:var(--dim);font-size:12px;margin-bottom:4px}
 .media video,.media img{width:260px;border-radius:8px;border:1px solid var(--line);background:#111}
 .empty{color:var(--dim)}
-.player{width:300px}
+.player{display:flex;gap:16px;align-items:flex-start}
+.player>div:first-child{width:300px}
+.player ol.steps{width:250px;margin-top:20px;max-height:640px;overflow:auto}
+ol.steps li{cursor:pointer;padding:3px 6px;border-radius:5px}
+ol.steps li:hover{background:#ebe7dd}
+ol.steps li.now{background:#f3ead6}
+ol.steps li.bad{color:var(--bad)} ol.steps li.bad:before{content:"✗ ";color:var(--bad)}
+ol.steps li.off:after{content:" ◷";color:#e8a33c}
 .player video{width:300px;display:block;border-radius:8px 8px 0 0;border:1px solid var(--line);background:#111}
 .ctrl{display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .ctrl button{border:0;background:var(--ink);color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:11px}
@@ -99,20 +117,40 @@ function renderLive(){
   for(const w of ws){
     let card=grid.querySelector(`[data-w="${CSS.escape(w.key)}"]`);
     if(!card){card=document.createElement('div');card.className='card';card.dataset.w=w.key;
-      card.innerHTML='<img alt=""><div class="info"><div class="who"></div><div class="test"></div><ol></ol></div>';
-      grid.appendChild(card);startScreen(w.key,card.querySelector('img'));}
+      card.innerHTML='<div class="screen"><img alt=""><div class="loader"><div class="spin"></div><b></b><span></span></div></div>'
+        +'<div class="info"><div class="who"></div><div class="test"></div><ol></ol></div>';
+      grid.appendChild(card);}
     const test=state.tests.find(x=>x.key===w.test);
-    card.querySelector('.who').textContent=`${w.profile} · emulator ${w.worker+1} · ${test?'running':w.status}`;
+    if(w.live)startScreen(w.key,card.querySelector('img'));
+    const [title,sub]=phase(w, test);
+    card.querySelector('.loader b').textContent=title;
+    card.querySelector('.loader span').textContent=sub;
+    card.classList.toggle('stopped',/shutting down|stopped/.test(w.status));
+    card.querySelector('.who').textContent=`${w.profile} · emulator ${w.worker+1} · ${test?'running':title.toLowerCase()}`;
     card.querySelector('.test').textContent=test?(test.labels[0]||test.name):'';
     const at=w.steps.indexOf(w.step);
     card.querySelector('ol').innerHTML=w.steps.map((s,i)=>`<li class="${i<at?'done':i===at?'now':'next'}">${esc(s)}</li>`).join('');
   }
   if(!ws.length)grid.innerHTML='<p class="empty">No emulator yet.</p>';
 }
+// What an emulator without a screen yet is doing, as a title and a detail.
+function phase(w,test){
+  const s=w.status||'';
+  if(/shutting down/.test(s))return ['Shutting down','Out of scenarios, or stopped early (the run says why at the end)'];
+  if(/building/.test(s))return ['Building the app','Once for the whole run'];
+  if(/firebase/.test(s))return ['Starting Firebase','Auth and Firestore emulators'];
+  if(/booting/.test(s))return ['Booting the emulator','A wiped Android, about a minute'];
+  if(/booted/.test(s)&&!test)return ['Waiting','For the build or the next scenario'];
+  if(test)return ['Starting the app',test.labels[0]||test.name];
+  return ['Starting','']; 
+}
 function startScreen(key,img){
   if(screens[key])return; screens[key]=true;
+  const box=img.parentNode;
   const next=()=>setTimeout(()=>{if(!document.body.contains(img)){delete screens[key];return;}img.src=`screen/${encodeURIComponent(key)}?t=${Date.now()}`},400);
-  img.onload=next; img.onerror=()=>setTimeout(next,1500); next();
+  img.onload=()=>{box.classList.add('on');next();};
+  img.onerror=()=>{box.classList.remove('on');setTimeout(next,1500);};
+  next();
 }
 
 function renderDetail(){
@@ -152,9 +190,10 @@ function renderDetail(){
 }
 function player(caption,kind,name,prof,r){
   return `<figure class="player" data-kind="${kind}" data-path="${kind}/${name}/${prof}" data-failed="${esc(r&&r.outcome==='failed'?r.step||'':'')}">
-    <figcaption>${caption}</figcaption><video muted playsinline preload="auto" src="video/${kind}/${name}/${prof}"></video>
+    <div><figcaption>${caption}</figcaption><video muted playsinline preload="auto" src="video/${kind}/${name}/${prof}"></video>
     <div class="ctrl"><button>▶</button><span class="time">00:00</span></div>
-    <div class="track"><div class="head"></div></div><div class="nowstep"></div></figure>`;
+    <div class="track"><div class="head"></div></div><div class="nowstep"></div></div>
+    <ol class="steps"></ol></figure>`;
 }
 // Seconds per step in a timeline.
 const perStep=tl=>tl.reduce((m,r)=>(m[r.step]=(m[r.step]||0)+r.end-r.start,m),{});
@@ -181,14 +220,19 @@ function setupPlayer(f,tl,mine,theirs,failed){
   // Step bands: consecutive runs of one step.
   const bands=[];
   for(const r of tl){const b=bands[bands.length-1]; if(b&&b.step===r.step)b.end=r.end; else bands.push({step:r.step,start:r.start,end:r.end});}
-  let html='';
+  let html='', list='';
   bands.forEach((b,i)=>{
     const a=mine[b.step], t=theirs?theirs[b.step]:null;
     const off=theirs&&(t===undefined||Math.abs(a-t)>Math.max(0.5,0.25*Math.max(a,t)));
     const cls=b.step===failed?'bad':off?'off':(i%2?'b':'a');
     const why=theirs?` · ${a.toFixed(1)} s here, ${t===undefined?'missing':t.toFixed(1)+' s'} in the other`:` · ${(b.end-b.start).toFixed(1)} s`;
     html+=`<div class="band ${cls}" style="left:${100*b.start/total}%;width:${100*(b.end-b.start)/total}%" title="${esc(b.step+why)}"></div>`;
+    list+=`<li data-i="${i}" class="${cls==='bad'||cls==='off'?cls:''}" title="${esc(why.slice(3))}">${esc(b.step)}</li>`;
   });
+  // The same steps beside the video, following it; a click jumps there.
+  const steps=f.querySelector('ol.steps'); steps.innerHTML=list;
+  const items=[...steps.children];
+  steps.onclick=e=>{const li=e.target.closest('li');if(!li)return;v.currentTime=toVideo(bands[+li.dataset.i].start)+0.01;show();};
   for(const r of tl){
     if(r.kind!=='app')html+=`<div class="seg ${r.kind}" style="left:${100*r.start/total}%;width:${100*(r.end-r.start)/total}%"></div>`;
     if(r.snapshot)html+=`<div class="tick" style="left:${100*r.start/total}%" title="snapshot: ${esc(r.snapshot)}"></div>`;
@@ -199,6 +243,9 @@ function setupPlayer(f,tl,mine,theirs,failed){
   const show=()=>{const s=toTimeline(v.currentTime);head.style.left=(100*s/total)+'%';
     time.textContent=`${clock(v.currentTime*1000)} / ${clock((v.duration||total)*1000)}`;
     const r=tl.find(r=>s>=r.start&&s<r.end)||tl[tl.length-1];
+    const at=Math.max(0,bands.findIndex(b=>s>=b.start&&s<b.end));
+    items.forEach((li,i)=>{li.classList.toggle('done',i<at);li.classList.toggle('now',i===at);li.classList.toggle('next',i>at);});
+    if(!v.paused&&items[at])items[at].scrollIntoView({block:'nearest'});
     now.innerHTML=`${esc(r.step)}${r.kind==='device'?' <span class="counts">(phone screen)</span>':''}`;
     btn.textContent=v.paused?'▶':'❚❚';};
   const loop=()=>{show();if(!v.paused)requestAnimationFrame(loop);};
