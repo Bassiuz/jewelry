@@ -107,6 +107,17 @@ class ScenarioTester {
     await _capture.capture(snapshot: name);
   }
 
+  /// Leaves [target] out of the comparison until this step ends: wherever
+  /// it is drawn, its pixels are not compared in the video or in snapshots.
+  /// For widgets that animate on their own clock (a pulsing progress bar,
+  /// a hint arrow on a timer); the rest of the screen is still checked.
+  ///
+  /// [mustAnimate]: also check the widget really moves. The step fails when
+  /// its pixels are the same in every frame of the step.
+  void ignore(Object target, {bool mustAnimate = false}) => _capture
+      .ignoreThisStep
+      .add((finder: Target.of(target).finder, mustAnimate: mustAnimate));
+
   /// Pumps [count] frames, capturing each.
   Future<void> pump([int count = 1]) async {
     if (_backgrounded) {

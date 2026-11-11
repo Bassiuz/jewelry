@@ -26,13 +26,17 @@
 /// order. The notification shade's expand chevrons are `…:id/expand_button`.
 List<({int x, int y})> findNodeCentersById(String xml, String idSuffix) => [
   for (final node in RegExp(r'<node [^>]*>').allMatches(xml))
-    if ((RegExp(r'resource-id="([^"]*)"').firstMatch(node.group(0)!)?.group(1) ?? '')
+    if ((RegExp(r'resource-id="([^"]*)"')
+                .firstMatch(node.group(0)!)
+                ?.group(1) ??
+            '')
         .endsWith(idSuffix))
       ?_center(node.group(0)!),
 ];
 
 ({int x, int y})? _center(String attrs) {
-  final b = RegExp(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"').firstMatch(attrs);
+  final b = RegExp(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"')
+      .firstMatch(attrs);
   if (b == null) return null;
   final v = [for (var i = 1; i <= 4; i++) int.parse(b.group(i)!)];
   return (x: (v[0] + v[2]) ~/ 2, y: (v[1] + v[3]) ~/ 2);

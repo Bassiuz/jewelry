@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'captured_frame.dart';
+import 'ignored_region.dart';
 
 /// Grabs the root view after a pumped frame and tags it with the current step.
 class FrameCapture {
@@ -42,6 +43,33 @@ class FrameCapture {
       '${frames.length} frames in ${_total.elapsed.inSeconds} s: '
       'drawing ${_render.elapsed.inSeconds} s, encoding ${_encode.elapsed.inSeconds} s '
       '($_reused frames repeated the one before)';
+
+  /// Widgets the comparison leaves out (`t.ignore`): for the whole
+  /// scenario, and until the current step ends.
+  var ignoreAlways = <({Finder finder, bool mustAnimate})>[];
+  final ignoreThisStep = <({Finder finder, bool mustAnimate})>[];
+
+  /// Where the ignored widgets are on this frame, in frame pixels.
+  List<IgnoredRegion> _ignoredNow() => [
+    for (final i in [...ignoreAlways, ...ignoreThisStep])
+      for (final e in i.finder.evaluate())
+        if (e.renderObject case final RenderBox box
+            when box.attached && box.hasSize)
+          _region(box, i.mustAnimate),
+  ];
+
+  static IgnoredRegion _region(RenderBox box, bool mustAnimate) {
+    final topLeft = box.localToGlobal(Offset.zero);
+    final left = topLeft.dx.floor();
+    final top = topLeft.dy.floor();
+    return IgnoredRegion(
+      left,
+      top,
+      (topLeft.dx + box.size.width).ceil() - left,
+      (topLeft.dy + box.size.height).ceil() - top,
+      mustAnimate: mustAnimate,
+    );
+  }
 
   /// While true, captured frames are wait frames ([CapturedFrame.wait]).
   bool waiting = false;
@@ -136,6 +164,7 @@ class FrameCapture {
         png: png,
         snapshot: snapshot,
         wait: waiting && snapshot == null,
+        ignored: _ignoredNow(),
       ),
     );
   }

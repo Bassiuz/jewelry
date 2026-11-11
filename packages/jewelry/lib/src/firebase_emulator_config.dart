@@ -58,8 +58,8 @@ class FirebaseEmulatorConfig {
   /// ports is kept, rules and indexes included.
   String firebaseJson(String source) {
     final json = (jsonDecode(source) as Map).cast<String, dynamic>();
-    final emulators =
-        ((json['emulators'] as Map?) ?? {}).cast<String, dynamic>();
+    final emulators = ((json['emulators'] as Map?) ?? {})
+        .cast<String, dynamic>();
     Map<String, dynamic> block(String name) =>
         ((emulators[name] as Map?) ?? {}).cast<String, dynamic>();
     json['emulators'] = {

@@ -12,9 +12,14 @@ import 'run_progress.dart';
 /// of it is read from the failure folders, so the page is one static file
 /// with relative links.
 void writeHtmlReport(RunLog log, {required String dart}) {
-  final failed = [for (final r in log.results) if (r.failed) r];
-  final fine = [for (final r in log.results) if (!r.failed) r]
-    ..sort((a, b) => a.label.compareTo(b.label));
+  final failed = [
+    for (final r in log.results)
+      if (r.failed) r,
+  ];
+  final fine = [
+    for (final r in log.results)
+      if (!r.failed) r,
+  ]..sort((a, b) => a.label.compareTo(b.label));
   final latest = log.results
       .map((r) => r.ranAt)
       .fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
@@ -75,13 +80,19 @@ void writeHtmlReport(RunLog log, {required String dart}) {
 
     if (has('expected_frame.png') && has('diff.png')) {
       html.writeln('<h4>The frame it failed on</h4><div class="frames">');
-      html.writeln(_figure('${r.failureDir}/expected_frame.png', 'Expected (golden)'));
-      html.writeln(_figure('${r.failureDir}/actual_frame.png', 'Actual (this run)'));
+      html.writeln(
+        _figure('${r.failureDir}/expected_frame.png', 'Expected (golden)'),
+      );
+      html.writeln(
+        _figure('${r.failureDir}/actual_frame.png', 'Actual (this run)'),
+      );
       html.writeln(_figure('${r.failureDir}/diff.png', 'Difference in red'));
       html.writeln('</div>');
     } else if (has('actual_frame.png')) {
       html.writeln('<h4>Where it stopped</h4><div class="frames">');
-      html.writeln(_figure('${r.failureDir}/actual_frame.png', 'Last frame of the run'));
+      html.writeln(
+        _figure('${r.failureDir}/actual_frame.png', 'Last frame of the run'),
+      );
       html.writeln('</div>');
     }
 
@@ -126,9 +137,13 @@ void writeHtmlReport(RunLog log, {required String dart}) {
     }
 
     if (has('actual.apng')) {
-      html.writeln('<details><summary>Play the recordings</summary><div class="frames">');
+      html.writeln(
+        '<details><summary>Play the recordings</summary><div class="frames">',
+      );
       if (has('expected.apng')) {
-        html.writeln(_figure('${r.failureDir}/expected.apng', 'Expected (golden)'));
+        html.writeln(
+          _figure('${r.failureDir}/expected.apng', 'Expected (golden)'),
+        );
       }
       html.writeln(_figure('${r.failureDir}/actual.apng', 'Actual (this run)'));
       html.writeln('</div></details>');
@@ -141,7 +156,9 @@ void writeHtmlReport(RunLog log, {required String dart}) {
         '<code>$dart run jewelry accept "${_e(r.label)}"</code></p>',
       );
     }
-    html.writeln('<p>Rerun: <code>$dart run jewelry run ${_e(r.file)}</code></p>');
+    html.writeln(
+      '<p>Rerun: <code>$dart run jewelry run ${_e(r.file)}</code></p>',
+    );
     if (r.log != null) {
       html.writeln('<p><a href="${_e(r.log!)}">flutter test output</a></p>');
     }

@@ -1,6 +1,5 @@
 import 'dart:io';
 
-
 import 'comparison_result.dart';
 import 'diff_png.dart';
 import 'scenario_recording.dart';
@@ -29,8 +28,14 @@ void writeFailureReport({
     ComparisonPassed() => (-1, -1),
   };
   // The comparison counts compared frames only: no device or wait frames.
-  final goldenEngine = [for (final f in golden.frames) if (!f.device && !f.wait) f];
-  final actualEngine = [for (final f in actual.frames) if (!f.device && !f.wait) f];
+  final goldenEngine = [
+    for (final f in golden.frames)
+      if (!f.device && !f.wait) f,
+  ];
+  final actualEngine = [
+    for (final f in actual.frames)
+      if (!f.device && !f.wait) f,
+  ];
   // ponytail: one diff frame at the failure, not a diff APNG. Enough to see
   // what broke; the full pair plays in viewer.html.
   if (goldenIndex >= 0 &&
@@ -42,10 +47,7 @@ void writeFailureReport({
     File('${dir.path}/actual_frame.png')
         .writeAsBytesSync(actualEngine[actualIndex].png);
     File('${dir.path}/diff.png').writeAsBytesSync(
-      diffPng(
-        goldenEngine[goldenIndex].png,
-        actualEngine[actualIndex].png,
-      ),
+      diffPng(goldenEngine[goldenIndex].png, actualEngine[actualIndex].png),
     );
   }
 

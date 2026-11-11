@@ -1,9 +1,7 @@
 import 'dart:typed_data';
 
-// ignore: implementation_imports
-import 'package:flutter_golden_animation/src/diff/frame_comparator.dart';
-
 import 'captured_frame.dart';
+import 'ignored_region.dart';
 import 'comparison_result.dart';
 
 /// Ordered drift-window matching.
@@ -22,14 +20,20 @@ ComparisonResult compareFrameSequences({
   int drift = 30,
   double tolerance = 0.0,
 }) {
-  golden = [for (final f in golden) if (!f.device && !f.wait) f];
-  actual = [for (final f in actual) if (!f.device && !f.wait) f];
+  golden = [
+    for (final f in golden)
+      if (!f.device && !f.wait) f,
+  ];
+  actual = [
+    for (final f in actual)
+      if (!f.device && !f.wait) f,
+  ];
   final decoded = _Decoded(actual);
   var cursor = 0;
   var maxDrift = 0;
 
   for (var i = 0; i < golden.length; i++) {
-    final expected = decodePngToRgba(golden[i].png);
+    final expected = frameRgba(golden[i]);
     var found = -1;
     // ponytail: linear scan from the cursor; the success path matches at the
     // cursor, so only failures walk the list.
@@ -120,5 +124,5 @@ class _Decoded {
   final List<CapturedFrame> _frames;
   final List<Uint8List?> _cache;
 
-  Uint8List operator [](int i) => _cache[i] ??= decodePngToRgba(_frames[i].png);
+  Uint8List operator [](int i) => _cache[i] ??= frameRgba(_frames[i]);
 }

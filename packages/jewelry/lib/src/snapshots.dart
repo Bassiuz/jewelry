@@ -1,10 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-// ignore: implementation_imports
-import 'package:flutter_golden_animation/src/diff/frame_comparator.dart';
-
+import 'captured_frame.dart';
 import 'compare.dart';
+import 'ignored_region.dart';
 import 'diff_png.dart';
 import 'scenario_recording.dart';
 import 'slug.dart';
@@ -57,25 +56,39 @@ class SnapshotGoldens {
       final file = _file(name);
       goldenNames.remove(slug(name));
       if (!file.existsSync()) {
-        mismatches.add(SnapshotMismatch(name, 'no image golden, run with --record'));
+        mismatches.add(
+          SnapshotMismatch(name, 'no image golden, run with --record'),
+        );
         continue;
       }
-      final diff = snapshotDiffPercent(file.readAsBytesSync(), frame.png);
+      final diff = snapshotDiffPercent(file.readAsBytesSync(), frame);
       if (diff > tolerance) {
         mismatches.add(
-          SnapshotMismatch(name, '${diff.toStringAsFixed(2)}% of pixels differ'),
+          SnapshotMismatch(
+            name,
+            '${diff.toStringAsFixed(2)}% of pixels differ',
+          ),
         );
       }
     }
     for (final missing in goldenNames) {
-      mismatches.add(SnapshotMismatch(missing, 'golden exists, the run took no such snapshot'));
+      mismatches.add(
+        SnapshotMismatch(
+          missing,
+          'golden exists, the run took no such snapshot',
+        ),
+      );
     }
     return mismatches;
   }
 
   /// Writes `<name>.expected.png`, `<name>.actual.png` and `<name>.diff.png`
   /// for every pixel mismatch into [into].
-  void writeDiffs(ScenarioRecording actual, List<SnapshotMismatch> mismatches, Directory into) {
+  void writeDiffs(
+    ScenarioRecording actual,
+    List<SnapshotMismatch> mismatches,
+    Directory into,
+  ) {
     final shots = actual.snapshots;
     for (final m in mismatches) {
       final golden = _file(m.name);
@@ -85,14 +98,19 @@ class SnapshotGoldens {
       final base = '${into.path}/${slug(m.name)}';
       File('$base.expected.png').writeAsBytesSync(golden.readAsBytesSync());
       File('$base.actual.png').writeAsBytesSync(frame.png);
-      File('$base.diff.png').writeAsBytesSync(
-        diffPng(golden.readAsBytesSync(), frame.png),
-      );
+      File('$base.diff.png')
+          .writeAsBytesSync(diffPng(golden.readAsBytesSync(), frame.png));
     }
   }
 }
 
-/// Percentage of differing pixels between two PNGs, ignoring
-/// [channelNoise]; 100 when the sizes differ.
-double snapshotDiffPercent(Uint8List a, Uint8List b) =>
-    rgbaDiffPercent(decodePngToRgba(a), decodePngToRgba(b));
+/// Percentage of differing pixels between an image golden and the frame
+/// of this run, ignoring [channelNoise] and the frame's ignored regions
+/// (in both); 100 when the sizes differ.
+double snapshotDiffPercent(Uint8List golden, CapturedFrame frame) =>
+    rgbaDiffPercent(
+      frameRgba(
+        CapturedFrame(step: frame.step, png: golden, ignored: frame.ignored),
+      ),
+      frameRgba(frame),
+    );

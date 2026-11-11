@@ -129,7 +129,7 @@ class RunProgress {
                   '${_paint(r.reason, _red)}'
             : '${_paint('✓', _green)} ${r.label}  ${_paint(time, _dim)}  '
                   '${_paint('${r.outcome.name}, ${r.frames} frames, '
-                      '${r.snapshots} snapshots', _dim)}',
+                  '${r.snapshots} snapshots', _dim)}',
       );
     }
   }
@@ -143,7 +143,10 @@ class RunProgress {
   /// The closing report: every failure with its reason, where to look and
   /// how to rerun it, then the counts.
   void summary(List<ScenarioResult> results, {required String dart}) {
-    final failures = [for (final r in results) if (r.failed) r];
+    final failures = [
+      for (final r in results)
+        if (r.failed) r,
+    ];
     final rule = '─' * 60;
     _out
       ..writeln()
@@ -213,8 +216,7 @@ class RunProgress {
     final time = estimate == null
         ? clock(elapsed)
         : '${clock(elapsed)} / ~${clock(estimate!)}';
-    var counts =
-        ' $_done/$total · $_passed passed · $_failed failed · $time';
+    var counts = ' $_done/$total · $_passed passed · $_failed failed · $time';
     final where = _running.isEmpty
         ? [_status]
         : [
@@ -226,10 +228,16 @@ class RunProgress {
           ];
     // A wrapped footer line would break the cursor arithmetic in _erase.
     if (counts.length > width - barWidth - 2) {
-      counts = counts.substring(0, (width - barWidth - 2).clamp(0, counts.length));
+      counts = counts.substring(
+        0,
+        (width - barWidth - 2).clamp(0, counts.length),
+      );
     }
     if (_failed > 0) {
-      counts = counts.replaceFirst('$_failed failed', '$_red$_failed failed$_reset');
+      counts = counts.replaceFirst(
+        '$_failed failed',
+        '$_red$_failed failed$_reset',
+      );
     }
     _out.write(
       '[$_green${'█' * filled}$_reset${'░' * (barWidth - filled)}]$counts\n'

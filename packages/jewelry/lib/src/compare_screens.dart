@@ -1,9 +1,7 @@
 import 'dart:typed_data';
 
-// ignore: implementation_imports
-import 'package:flutter_golden_animation/src/diff/frame_comparator.dart';
-
 import 'captured_frame.dart';
+import 'ignored_region.dart';
 import 'compare.dart';
 import 'comparison_result.dart';
 
@@ -59,7 +57,7 @@ List<_Screen> _screens(List<CapturedFrame> frames, double tolerance) {
   var compared = 0;
   for (final f in frames) {
     if (f.device) continue;
-    final rgba = decodePngToRgba(f.png);
+    final rgba = frameRgba(f);
     // Against the first frame of the run, not the previous one, so a slow
     // fade cannot creep through as one screen.
     if (screens.isEmpty || !rgbaMatches(screens.last.rgba, rgba, tolerance)) {

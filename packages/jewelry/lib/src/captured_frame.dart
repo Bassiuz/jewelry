@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'ignored_region.dart';
+
 /// One frame as lossless PNG, tagged with the step that produced it.
 class CapturedFrame {
   const CapturedFrame({
@@ -8,10 +10,17 @@ class CapturedFrame {
     this.device = false,
     this.snapshot,
     this.wait = false,
+    this.ignored = const [],
   });
 
-  CapturedFrame asWait() =>
-      CapturedFrame(step: step, png: png, device: device, snapshot: snapshot, wait: true);
+  CapturedFrame asWait() => CapturedFrame(
+    step: step,
+    png: png,
+    device: device,
+    snapshot: snapshot,
+    wait: true,
+    ignored: ignored,
+  );
 
   final String step;
   final Uint8List png;
@@ -31,4 +40,8 @@ class CapturedFrame {
   /// ran into its cap (a spinner). How many such frames there are depends
   /// on I/O timing, so they are shown but not compared.
   final bool wait;
+
+  /// Regions the comparison skips (`t.ignore`): widgets that animate on
+  /// their own clock.
+  final List<IgnoredRegion> ignored;
 }

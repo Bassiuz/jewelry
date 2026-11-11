@@ -22,7 +22,9 @@ import 'snapshots.dart';
   for (final r in log.results) {
     if (!r.failed) continue;
     if (only.isNotEmpty &&
-        !only.any((o) => o == r.label || slug(o) == slug(r.label) || o == r.file)) {
+        !only.any(
+          (o) => o == r.label || slug(o) == slug(r.label) || o == r.file,
+        )) {
       continue;
     }
     final failure = Directory('${log.dir.path}/${r.failureDir}');

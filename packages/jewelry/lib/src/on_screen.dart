@@ -16,7 +16,8 @@ class OnScreenFinder extends ChainedFinder {
   OnScreenFinder(super.parent);
 
   @override
-  String get description => '${parent.describeMatch(Plurality.many)} (on screen)';
+  String get description =>
+      '${parent.describeMatch(Plurality.many)} (on screen)';
 
   @override
   Iterable<Element> filter(Iterable<Element> parentCandidates) sync* {
@@ -27,7 +28,11 @@ class OnScreenFinder extends ChainedFinder {
       final view = candidate.findAncestorRenderObjectOfType<RenderView>();
       if (view == null) continue;
       final result = HitTestResult();
-      WidgetsBinding.instance.hitTestInView(result, center, view.flutterView.viewId);
+      WidgetsBinding.instance.hitTestInView(
+        result,
+        center,
+        view.flutterView.viewId,
+      );
       final top = result.path
           .map((e) => e.target)
           .whereType<RenderObject>()

@@ -42,6 +42,7 @@ void scenario(
   required Launch launch,
   required List<Step> steps,
   List<Pattern> ignoreErrors = const [],
+  List<Object> ignore = const [],
   Duration pauseAfterStep = const Duration(seconds: 1),
 }) {
   testWidgets(label, (tester) {
@@ -68,6 +69,12 @@ void scenario(
           addTearDown(tester.testTextInput.unregister);
         }
         final capture = FrameCapture(tester);
+        // Left out of every comparison in this scenario (see t.ignore); the
+        // context's list, so ctx.ignore in launch counts too.
+        for (final i in ignore) {
+          ctx.ignore(i);
+        }
+        capture.ignoreAlways = ctx.ignored;
         final channel = JewelryBinding.isActive
             ? await HostChannel.open(label)
             : null;
@@ -104,6 +111,7 @@ void scenario(
               // Leaves each step's result on screen in the recording; the last
               // one is the scenario's final screen.
               await t.hold(pauseAfterStep);
+              capture.ignoreThisStep.clear();
             } catch (e, stack) {
               // Printed here because the app may have pointed FlutterError.onError
               // at its crash reporter, which then swallows the test's own report.

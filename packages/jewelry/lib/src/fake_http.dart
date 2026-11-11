@@ -6,7 +6,10 @@ import 'package:flutter/foundation.dart';
 
 /// Answers one route: gets the decoded JSON body (or null) and the request,
 /// returns the JSON response body. Throw [FakeHttpStatus] for an error.
-typedef FakeRoute = FutureOr<Object?> Function(Object? body, HttpRequest request);
+typedef FakeRoute = FutureOr<Object?> Function(
+  Object? body,
+  HttpRequest request,
+);
 
 /// An HTTP error answer from a [FakeRoute].
 class FakeHttpStatus implements Exception {

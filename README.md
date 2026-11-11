@@ -82,6 +82,16 @@ Each finished scenario gets one line. The run ends with a summary that lists eve
 
 `jewelry dashboard` opens the same page for the last run without running anything: every result, failed ones first. Each recording plays with a bar you can drag, split into the scenario's steps: the step that failed is red, a step that took a clearly different time than in the other recording is orange, phone screens are marked blue, frames that are not compared are hatched, and snapshots are white ticks. The page's address keeps the selected scenario, so a result can be linked.
 
+Some widgets animate on their own clock: a hint that starts after a wall-clock timer, a progress indicator that pulses as long as a step is open. Leave them out of the comparison instead of the whole step:
+
+```dart
+t.ignore(find.byType(ProgressBarStepIndicator));                 // until this step ends
+t.ignore(find.byKey(const Key('spinner')), mustAnimate: true);   // and fail if it stands still
+ctx.ignore(find.byType(HintArrow));                              // in launch: the whole scenario
+```
+
+At every frame jewelry measures where the widget is drawn and stores that rectangle with the frame. Comparisons of the video and of snapshots skip those pixels; the rest of the screen is still checked. With `mustAnimate` the step fails when the widget's pixels never change. Goldens recorded before a widget was ignored do not carry its rectangle, so record them again.
+
 `jewelry video <scenario>` writes `.jewelry/videos/<scenario>.<profile>.mp4`: an H.264 video of the golden, a few hundred kilobytes where the APNG is tens of megabytes, that plays in Slack or a browser. The name is a folder under `.jewelry/goldens`, or a unique part of one. App frames keep their 60 Hz timing; phone frames (lock screen, home screen), taken about once a second while the scenario waited, show for a tenth of a second each.
 
 ### Defaults in `jewelry.yaml`

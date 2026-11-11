@@ -8,6 +8,7 @@ import 'package:flutter_golden_animation/src/apng/decoder.dart';
 import 'package:flutter_golden_animation/src/apng/encoder.dart';
 
 import 'captured_frame.dart';
+import 'ignored_region.dart';
 
 /// The frames of one scenario run: an APNG plus a steps sidecar, because
 /// APNG has nowhere to put the step a frame belongs to.
@@ -43,7 +44,9 @@ class ScenarioRecording {
           (runs.last['device'] == true) == f.device &&
           (runs.last['wait'] == true) == f.wait &&
           runs.last['snapshot'] == null &&
-          f.snapshot == null) {
+          f.snapshot == null &&
+          jsonEncode(runs.last['ignore'] ?? const []) ==
+              jsonEncode(f.ignored)) {
         runs.last['frames'] = (runs.last['frames']! as int) + 1;
       } else {
         runs.add({
@@ -52,6 +55,7 @@ class ScenarioRecording {
           if (f.device) 'device': true,
           if (f.wait) 'wait': true,
           if (f.snapshot != null) 'snapshot': f.snapshot!,
+          if (f.ignored.isNotEmpty) 'ignore': f.ignored,
         });
       }
     }
@@ -69,6 +73,10 @@ class ScenarioRecording {
             device: r['device'] == true,
             snapshot: r['snapshot'] as String?,
             wait: r['wait'] == true,
+            ignored: [
+              for (final j in (r['ignore'] as List?) ?? const [])
+                IgnoredRegion.fromJson(j as List),
+            ],
           ),
     ];
     if (steps.length != pngs.length) {
@@ -84,6 +92,7 @@ class ScenarioRecording {
           device: steps[i].device,
           snapshot: steps[i].snapshot,
           wait: steps[i].wait,
+          ignored: steps[i].ignored,
         ),
     ]);
   }

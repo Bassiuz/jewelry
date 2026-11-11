@@ -24,6 +24,7 @@ import 'package:jewelry/src/run_progress.dart';
 import 'package:jewelry/src/scenario_recording.dart';
 import 'package:jewelry/src/scenario_result.dart';
 import 'package:jewelry/src/dashboard.dart';
+import 'package:jewelry/src/ignored_region.dart';
 import 'package:jewelry/src/scenario_suite.dart';
 import 'package:jewelry/src/video.dart';
 import 'package:jewelry/src/slug.dart';
@@ -1116,7 +1117,24 @@ List<ScenarioResult> _judgeRun(_Judge j) {
     final dir = Directory('.jewelry/failures/${slug(label)}/${j.profile}');
     if (dir.existsSync()) dir.deleteSync(recursive: true);
 
-    if (j.exitCode != 0) {
+    // t.ignore(..., mustAnimate: true): the widget must have moved.
+    final still = j.exitCode == 0
+        ? stillAnimations(actual)
+        : const <({String step, String message})>[];
+    if (still.isNotEmpty) {
+      dir.createSync(recursive: true);
+      actual.write('${dir.path}/actual');
+      results.add(
+        result(
+          label,
+          Outcome.failed,
+          reason: 'An animation did not run',
+          detail: still.map((s) => s.message).join('\n'),
+          step: still.first.step,
+          recording: actual,
+        ),
+      );
+    } else if (j.exitCode != 0) {
       // A step failed; keep the frames up to the failure as evidence.
       dir.createSync(recursive: true);
       actual.write('${dir.path}/actual');

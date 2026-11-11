@@ -32,7 +32,8 @@ class JewelryConfig {
       profiles: profiles,
       drift: yaml['drift'] as int? ?? 30,
       tolerance: (yaml['tolerance'] as num? ?? 0).toDouble(),
-      match: MatchMode.values.asNameMap()[yaml['match'] ?? 'frames'] ??
+      match:
+          MatchMode.values.asNameMap()[yaml['match'] ?? 'frames'] ??
           (throw FormatException(
             'match: expected frames or screens, got ${yaml['match']}',
           )),
@@ -54,7 +55,9 @@ class JewelryConfig {
       clock: switch (yaml['clock']) {
         null => null,
         final String c => DateTime.parse(c),
-        final other => throw FormatException('clock: expected an ISO date, got $other'),
+        final other => throw FormatException(
+          'clock: expected an ISO date, got $other',
+        ),
       },
     );
   }
