@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'dart:ui' show ViewPadding;
@@ -88,6 +89,11 @@ void scenario(
         capture.waiting = false;
 
         try {
+          // The whole plan up front, for the live dashboard.
+          debugPrint(
+            'jewelry: steps\t$label\t'
+            '${jsonEncode([for (final s in steps) s.label])}',
+          );
           for (final s in steps) {
             capture.currentStep = s.label;
             // Lands in the flutter test output and the device log, so a run that

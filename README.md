@@ -78,6 +78,8 @@ Each finished scenario gets one line. The run ends with a summary that lists eve
 
 `jewelry accept` runs nothing. A failed comparison leaves its complete recording in `.jewelry/failures/`, and accept copies that over the golden, snapshots included. `jewelry accept "Diary note"` takes one scenario. A scenario whose step failed is refused: that run stopped halfway.
 
+`jewelry run` serves a live dashboard at http://localhost:4848/ while it runs: every scenario with its state on the left, every emulator's screen with the scenario's steps (done, now, still to come) on the right. Click a scenario for its golden as a video, or a failure's recording, reason and difference images. `--no-dashboard` turns it off, `--dashboard-port` moves it.
+
 `jewelry video <scenario>` writes `.jewelry/videos/<scenario>.<profile>.mp4`: an H.264 video of the golden, a few hundred kilobytes where the APNG is tens of megabytes, that plays in Slack or a browser. The name is a folder under `.jewelry/goldens`, or a unique part of one. App frames keep their 60 Hz timing; phone frames (lock screen, home screen), taken about once a second while the scenario waited, show for a tenth of a second each.
 
 ### Defaults in `jewelry.yaml`

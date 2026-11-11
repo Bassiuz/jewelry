@@ -23,6 +23,7 @@ import 'package:jewelry/src/run_log.dart';
 import 'package:jewelry/src/run_progress.dart';
 import 'package:jewelry/src/scenario_recording.dart';
 import 'package:jewelry/src/scenario_result.dart';
+import 'package:jewelry/src/dashboard.dart';
 import 'package:jewelry/src/scenario_suite.dart';
 import 'package:jewelry/src/video.dart';
 import 'package:jewelry/src/slug.dart';
@@ -67,6 +68,12 @@ Future<void> main(List<String> argv) async {
       help: 'Print the flutter test output',
     )
     ..addFlag('window', negatable: false, help: 'Show the emulator window')
+    ..addFlag(
+      'dashboard',
+      defaultsTo: true,
+      help: 'Serve a live dashboard of the run on localhost',
+    )
+    ..addOption('dashboard-port', help: 'Port of the dashboard (4848)')
     ..addOption('parallel', help: 'Emulators at once')
     ..addOption('profile', help: 'Only this profile')
     ..addOption('match', allowed: ['frames', 'screens'])
@@ -197,6 +204,13 @@ Future<void> main(List<String> argv) async {
         );
         exit(args['failed'] as bool ? 0 : 2);
       }
+      if (args['dashboard'] as bool) {
+        _dashboard = Dashboard(root: Directory('.jewelry'));
+        await _dashboard!.start(
+          port: int.tryParse(args['dashboard-port'] ?? '') ?? 4848,
+        );
+        print('jewelry: live dashboard at ${_dashboard!.url}');
+      }
       final failed = await _run(
         config: config,
         profiles: profiles,
@@ -213,6 +227,7 @@ Future<void> main(List<String> argv) async {
         rest: int.tryParse(args['rest'] ?? '') ?? config.rest,
         tolerance: double.tryParse(args['tolerance'] ?? '') ?? config.tolerance,
       );
+      await _dashboard?.stop();
       exit(failed ? 1 : 0);
     default:
       print(usage);
@@ -290,6 +305,7 @@ Future<bool> _run({
   try {
     for (final profile in profiles) {
       final queue = log.longestFirst(files, profile.name);
+      _dashboard?.queue(profile.name, queue);
       final count = workersFor(profile);
       // A worker that dies (its emulator did not boot) leaves its share of
       // the queue to the others; the error is shown once they are done.
@@ -387,7 +403,12 @@ Future<void> _worker({
           final name = 'app-${builds.length}.apk';
           final done = await building.take();
           try {
-            progress.status('$who: building the app, once for this run');
+            _say(
+              progress,
+              profile.name,
+              worker,
+              '$who: building the app, once for this run',
+            );
             return await _buildApk(testArgs, name);
           } finally {
             done();
@@ -400,13 +421,16 @@ Future<void> _worker({
   final judging = <Future<void>>[];
   try {
     if (emulators != null) {
-      progress.status(
+      _say(
+        progress,
+        profile.name,
+        worker,
         '$who: firebase emulators starting (${fb!.only.join(', ')})',
       );
       await emulators.start();
     }
     final bootedTurn = await booting.take();
-    progress.status('$who: booting');
+    _say(progress, profile.name, worker, '$who: booting');
     final String id;
     try {
       id = await device.boot();
@@ -414,7 +438,8 @@ Future<void> _worker({
       bootedTurn();
     }
     booted = true;
-    progress.status('$who: booted as $id');
+    _say(progress, profile.name, worker, '$who: booted as $id');
+    _dashboard?.attach(profile.name, worker, device);
     if (fb != null && device is AndroidDevice) {
       final base = config.firebase!;
       await device.reverse(base.authPort, fb.authPort);
@@ -440,6 +465,7 @@ Future<void> _worker({
       final file = queue.removeAt(0);
       final name = file.split('/').last;
       progress.start(named ? '$name on ${profile.name}' : name, worker: worker);
+      _dashboard?.started(profile.name, file, worker);
       final watch = Stopwatch()..start();
       await emulators?.clear();
       if (config.clock != null) await device.setClock(config.clock!);
@@ -504,6 +530,7 @@ Future<void> _worker({
         pulled: pulled,
       );
       progress.release(worker: worker);
+      _dashboard?.judging(profile.name, worker);
       judging.add(
         _judgeInIsolate(judge).then((results) {
           ran.addAll(results);
@@ -514,12 +541,13 @@ Future<void> _worker({
             ..save();
           writeHtmlReport(log, dart: _dart);
           progress.finish(results);
+          _dashboard?.finished(profile.name, file, results);
         }),
       );
     }
   } finally {
     await Future.wait(judging);
-    progress.status('$who: shutting down');
+    _say(progress, profile.name, worker, '$who: shutting down');
     if (booted) await device.stopLog();
     // A device that never booted may have nothing to shut down; its boot
     // error is the one to report.
@@ -604,6 +632,7 @@ class _Output {
 
   static final _stepFailed = RegExp(r'jewelry: step "(.*)" failed: (.*)$');
   static final _stepStarted = RegExp(r'jewelry: step "(.*)"$');
+  static final _stepsPlanned = RegExp(r'jewelry: steps\t(.*)\t(\[.*\])$');
   static final _uncaught = RegExp(r'jewelry: uncaught error in ".*": (.*)$');
 
   void add(String line) {
@@ -647,10 +676,19 @@ class _Output {
       if (_inDetail) detail.add(_short(line));
     } else {
       final started = _stepStarted.firstMatch(line);
+      final planned = _stepsPlanned.firstMatch(line);
       if (started != null) {
         step = started.group(1);
         onRunning?.call();
         progress.step(step!, worker: worker);
+        _dashboard?.step(profile, worker, step!);
+      } else if (planned != null) {
+        _dashboard?.planned(
+          profile,
+          worker,
+          planned.group(1)!,
+          (jsonDecode(planned.group(2)!) as List).cast<String>(),
+        );
       }
     }
   }
@@ -1142,4 +1180,15 @@ List<ScenarioResult> _judgeRun(_Judge j) {
     }
   }
   return results;
+}
+
+/// The live dashboard of this run, when it serves one.
+// ponytail: one run per process, so a global beats threading it through
+// every worker and output parser.
+Dashboard? _dashboard;
+
+/// A status line for the footer and the dashboard.
+void _say(RunProgress progress, String profile, int worker, String text) {
+  progress.status(text);
+  _dashboard?.status(profile, worker, text);
 }
