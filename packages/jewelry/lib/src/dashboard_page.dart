@@ -4,6 +4,7 @@
 const dashboardPage = r'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>jewelry</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root{--bg:#f6f5f2;--panel:#fff;--ink:#1d1b19;--dim:#7a756d;--line:#e4e0d8;
@@ -13,7 +14,8 @@ body{margin:0;font:14px/1.4 -apple-system,system-ui,sans-serif;color:var(--ink);
 display:grid;grid-template-columns:320px 1fr;height:100vh}
 aside{border-right:1px solid var(--line);background:var(--panel);overflow:auto}
 header{padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
-header h1{font-size:15px;margin:0 0 4px}
+header h1{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+header h1 img{width:24px;height:24px}
 .counts{color:var(--dim);font-size:12px}
 .bar{height:4px;background:var(--line);border-radius:2px;margin-top:8px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--ok)}
@@ -82,7 +84,7 @@ ol.steps li.off:after{content:" ◷";color:#e8a33c}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:4px 0 10px}
 .legend i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 </style></head><body>
-<aside><header><h1>jewelry</h1><div class="counts" id="counts"></div><div class="bar"><i id="bar"></i></div></header>
+<aside><header><h1><img src="logo.svg" alt="">jewelry</h1><div class="counts" id="counts"></div><div class="bar"><i id="bar"></i></div></header>
 <ul id="tests"></ul></aside>
 <main id="main"></main>
 <script>
@@ -96,10 +98,15 @@ async function poll(){
   try{state=await (await fetch('state.json')).json();render();}catch(e){$('#counts').textContent='run finished or stopped';}
   setTimeout(poll,1000);
 }
+// The expected end as a wall-clock time; once past the estimate, it moves with now.
+function endTime(){
+  const end=new Date(Date.now()+Math.max(0,state.estimateMs-state.elapsedMs));
+  return end.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
 function render(){
   const t=state.tests, done=t.filter(x=>['passed','failed','recorded'].includes(x.state));
   const failed=t.filter(x=>x.state==='failed').length;
-  $('#counts').textContent=`${done.length}/${t.length} done · ${done.length-failed} ok · ${failed} failed · ${clock(state.elapsedMs)}`;
+  $('#counts').textContent=`${done.length}/${t.length} done · ${done.length-failed} ok · ${failed} failed · ${clock(state.elapsedMs)}${state.estimateMs&&done.length<t.length?` · ends ~${endTime()}`:''}`;
   $('#bar').style.width=(t.length?100*done.length/t.length:0)+'%';
   $('#tests').innerHTML=t.map(x=>{
     const ms=x.results[0]?.durationMs; const label=x.labels[0]||x.name;
@@ -263,3 +270,28 @@ function setupPlayer(f,tl,mine,theirs,failed){
 }
 poll();
 </script></body></html>''';
+
+/// The jewelry ring, served as the page's logo and favicon.
+const jewelryLogo = r'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFE9A3"/>
+      <stop offset="0.45" stop-color="#E8B93C"/>
+      <stop offset="1" stop-color="#9C6A12"/>
+    </linearGradient>
+    <linearGradient id="ice" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EAF8FF"/>
+      <stop offset="1" stop-color="#7CC7EE"/>
+    </linearGradient>
+  </defs>
+  <!-- gold band -->
+  <circle cx="64" cy="76" r="38" fill="none" stroke="url(#gold)" stroke-width="10"/>
+  <!-- gold setting -->
+  <path d="M46 40 h36 l-6 8 h-24 z" fill="url(#gold)"/>
+  <!-- diamond -->
+  <g stroke="#2E6E91" stroke-width="1.5" stroke-linejoin="round">
+    <path d="M40 22 L52 8 H76 L88 22 L64 48 Z" fill="url(#ice)"/>
+    <path d="M40 22 H88 M52 8 L58 22 L64 48 L70 22 L76 8 M58 22 L64 8 L70 22" fill="none"/>
+  </g>
+  <path d="M55 12 L60 12 L56 19 Z" fill="#fff" opacity="0.9"/>
+</svg>''';

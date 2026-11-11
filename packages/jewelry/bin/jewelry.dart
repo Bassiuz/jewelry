@@ -314,6 +314,7 @@ Future<bool> _run({
     // The raw output and a redrawn footer do not mix.
     live: verbose ? false : null,
   );
+  _dashboard?.estimate = progress.estimate;
   progress.line(
     'jewelry: ${record ? 'recording' : 'comparing (${match.name})'} '
     '${files.length} scenario files on ${profiles.map((p) => p.name).join(', ')}'

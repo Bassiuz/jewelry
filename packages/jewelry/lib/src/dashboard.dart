@@ -30,6 +30,9 @@ class Dashboard {
   final _tests = <String, _Test>{};
   final _workers = <String, _Worker>{};
 
+  /// How long the whole run is expected to take, from the last run's times.
+  Duration? estimate;
+
   /// Where the page is, once [start] has run.
   Uri get url => Uri.parse('http://localhost:${_server!.port}/');
 
@@ -143,6 +146,7 @@ class Dashboard {
 
   Map<String, Object?> get state => {
     'elapsedMs': _clock.elapsedMilliseconds,
+    'estimateMs': estimate?.inMilliseconds,
     'tests': [
       for (final t in _tests.values)
         {
@@ -194,6 +198,11 @@ class Dashboard {
       if (path == '/') {
         res.headers.contentType = ContentType.html;
         res.write(dashboardPage);
+      } else if (path == '/logo.svg') {
+        res.headers
+          ..contentType = ContentType('image', 'svg+xml')
+          ..set('cache-control', 'max-age=86400');
+        res.write(jewelryLogo);
       } else if (path == '/state.json') {
         res.headers
           ..contentType = ContentType.json
