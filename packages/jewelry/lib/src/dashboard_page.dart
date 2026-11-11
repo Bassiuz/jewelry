@@ -28,6 +28,10 @@ li .t{color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
 .passed .dot,.failed .dot{background:none;border-radius:0;width:12px;height:auto;font-weight:700;font-size:13px;line-height:1;text-align:center}
 .passed .dot::after{content:'✓';color:var(--ok)} .failed .dot::after{content:'✗';color:var(--bad)}
 .recorded .dot{background:var(--rec)}
+.accepted .dot{background:none;border-radius:0;width:12px;height:auto;font-weight:700;font-size:13px;line-height:1;text-align:center}
+.accepted .dot::after{content:'✓';color:var(--rec)}
+.accept{border:1px solid var(--bad);background:#fff;color:var(--bad);border-radius:6px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;margin:2px 0 10px}
+.accept:hover{background:var(--bad);color:#fff} .accept:disabled{opacity:.5;cursor:wait}
 .running .dot,.judging .dot{background:var(--run);animation:p 1s infinite alternate}
 @keyframes p{to{opacity:.3}}
 main{overflow:auto;padding:18px 22px}
@@ -118,9 +122,9 @@ function endTime(){
   const end=new Date(Date.now()+Math.max(0,state.estimateMs-state.elapsedMs));
   return end.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
 }
-const stateTitle={queued:'Queued',running:'Running',judging:'Being compared',passed:'Passed: matches its golden',failed:'Failed',recorded:'Recorded: a new golden, nothing to compare against'};
+const stateTitle={queued:'Queued',running:'Running',judging:'Being compared',passed:'Passed: matches its golden',failed:'Failed',recorded:'Recorded: a new golden, nothing to compare against',accepted:'Accepted: this run is the new golden'};
 function render(){
-  const t=state.tests, done=t.filter(x=>['passed','failed','recorded'].includes(x.state));
+  const t=state.tests, done=t.filter(x=>['passed','failed','recorded','accepted'].includes(x.state));
   const failed=t.filter(x=>x.state==='failed').length;
   $('#counts').textContent=`${done.length}/${t.length} done · ${done.length-failed} ok · ${failed} failed · ${clock(state.elapsedMs)}${state.estimateMs&&done.length<t.length?` · ends ~${endTime()}`:''}`;
   $('#bar').style.width=(t.length?100*done.length/t.length:0)+'%';
@@ -188,7 +192,9 @@ function renderDetail(){
     <p class="counts">${esc(x.file)} · ${esc(x.profile)} · ${esc(x.state)}</p>`;
   const slugs=x.results.length?x.results.map(r=>r.slug):x.slugs;
   for(const r of x.results){
-    if(r.outcome==='failed'){html+=`<p class="reason">${esc(r.reason)}</p>${r.detail?`<pre>${esc(r.detail)}</pre>`:''}`;}
+    if(r.outcome==='failed'){html+=`<p class="reason">${esc(r.reason)}</p>${r.detail?`<pre>${esc(r.detail)}</pre>`:''}`;
+      html+=r.acceptable?`<button class="accept" data-label="${esc(r.label)}">Accept this run as the new golden</button>`
+        :'<p class="counts">This run cannot become the golden: it stopped before the end.</p>';}
     else html+=`<p>${esc(r.label)}: ${esc(r.outcome)}, ${r.frames} frames, ${clock(r.durationMs)}</p>`;
   }
   html+='<div class="media">';
@@ -203,6 +209,14 @@ function renderDetail(){
     <span><i style="background:var(--bad);width:3px"></i>difference: playback stops here</span></div>`;
   html+='<p><a href="files/report.html" target="_blank">Full report</a></p></div>';
   $('#main').innerHTML=html;
+  for(const b of document.querySelectorAll('button.accept'))b.onclick=async()=>{
+    if(!confirm(`Make this run the new golden for "${b.dataset.label}" on ${x.profile}?\n\nThe current golden video and snapshots are overwritten.`))return;
+    b.disabled=true;b.textContent='Accepting…';
+    try{const res=await (await fetch('accept/'+encodeURIComponent(x.key),{method:'POST'})).json();
+      if(!res.accepted)throw new Error('refused');
+      state=await (await fetch('state.json')).json();$('#main').dataset.shown='';render();}
+    catch(e){b.disabled=false;b.textContent='Accepting failed, try again';}
+  };
   initPlayers();
   $('#back').onclick=()=>{selected=null;history.replaceState(null,'',location.pathname);$('#main').innerHTML='';$('#main').dataset.shown='';render();};
 }

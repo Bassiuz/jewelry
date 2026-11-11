@@ -10,17 +10,19 @@ import 'snapshots.dart';
 /// anything: the failed comparison already left the complete recording in
 /// its failure folder.
 ///
-/// [only] narrows it to scenarios by label, slug or file; empty takes every
+/// [only] narrows it to scenarios by label, slug or file, and [profile] to
+/// one profile; empty takes every
 /// failure that can be accepted. A scenario whose step failed cannot: that
 /// run stopped halfway. Returns the accepted and the refused results.
 ({List<ScenarioResult> accepted, List<ScenarioResult> refused}) acceptLastRun(
   RunLog log, {
   List<String> only = const [],
+  String? profile,
 }) {
   final accepted = <ScenarioResult>[];
   final refused = <ScenarioResult>[];
   for (final r in log.results) {
-    if (!r.failed) continue;
+    if (!r.failed || (profile != null && r.profile != profile)) continue;
     if (only.isNotEmpty &&
         !only.any(
           (o) => o == r.label || slug(o) == slug(r.label) || o == r.file,

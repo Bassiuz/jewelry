@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'accept.dart';
 import 'dashboard_page.dart';
 import 'device/device.dart';
 import 'run_log.dart';
@@ -29,6 +30,10 @@ class Dashboard {
   final _clock = Stopwatch()..start();
   final _tests = <String, _Test>{};
   final _workers = <String, _Worker>{};
+
+  /// The results of the last runs, for the accept button. Without it the
+  /// page cannot accept anything.
+  RunLog? log;
 
   /// How long the whole run is expected to take, from the last run's times.
   Duration? estimate;
@@ -113,6 +118,8 @@ class Dashboard {
           ? 'failed'
           : results.any((r) => r.outcome == Outcome.recorded)
           ? 'recorded'
+          : results.any((r) => r.outcome == Outcome.accepted)
+          ? 'accepted'
           : 'passed';
     for (final r in results) {
       if (!t.labels.contains(r.label)) t.labels.add(r.label);
@@ -122,6 +129,7 @@ class Dashboard {
   /// Shows what [log] holds, the results of the last runs, as finished
   /// scenarios: for `jewelry dashboard`, which runs nothing. Failed first.
   void showLog(RunLog log) {
+    this.log = log;
     final byFile = <String, List<ScenarioResult>>{};
     for (final r in log.results) {
       byFile.putIfAbsent(_key(r.profile, r.file), () => []).add(r);
@@ -170,6 +178,7 @@ class Dashboard {
                 'durationMs': r.duration.inMilliseconds,
                 'frames': r.frames,
                 'failureDir': r.failed ? r.failureDir : null,
+                'acceptable': r.failed && r.acceptable && log != null,
                 'log': r.log,
               },
           ],
@@ -203,6 +212,9 @@ class Dashboard {
           ..contentType = ContentType('image', 'svg+xml')
           ..set('cache-control', 'max-age=86400');
         res.write(jewelryLogo);
+      } else if (path.startsWith('/accept/') && request.method == 'POST') {
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode(_accept(Uri.decodeComponent(path.substring(8)))));
       } else if (path == '/state.json') {
         res.headers
           ..contentType = ContentType.json
@@ -259,6 +271,20 @@ class Dashboard {
       ..contentType = ContentType('image', 'png')
       ..set('cache-control', 'no-store');
     res.add(w.last!);
+  }
+
+  /// Makes this run's recordings of the scenario file behind [key] its
+  /// goldens, as `jewelry accept` does.
+  Map<String, Object?> _accept(String key) {
+    final t = _tests[key];
+    if (t == null || log == null) return {'accepted': 0, 'refused': 0};
+    final (:accepted, :refused) = acceptLastRun(
+      log!,
+      only: [t.file],
+      profile: t.profile,
+    );
+    finished(t.profile, t.file, t.results);
+    return {'accepted': accepted.length, 'refused': refused.length};
   }
 
   /// The recording behind `<kind>/<slug>/<profile>`: `golden` or `failure`

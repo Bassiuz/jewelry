@@ -231,7 +231,7 @@ Future<void> main(List<String> argv) async {
         exit(args['failed'] as bool ? 0 : 2);
       }
       if (args['dashboard'] as bool) {
-        _dashboard = Dashboard(root: Directory('.jewelry'));
+        _dashboard = Dashboard(root: Directory('.jewelry'))..log = log;
         await _dashboard!.start(
           port: int.tryParse(args['dashboard-port'] ?? '') ?? 4848,
         );
