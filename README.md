@@ -60,6 +60,7 @@ dart run jewelry run --record      # on a known-good branch: record goldens
 dart run jewelry run               # on your branch: compare
 dart run jewelry run --failed      # only what failed last time
 dart run jewelry accept            # the last run is right: make its recordings the goldens
+dart run jewelry video full_screen_alarm   # the golden as an MP4 to share (needs ffmpeg)
 dart run jewelry devices           # list AVDs and simulators matching jewelry.yaml
 ```
 
@@ -76,6 +77,8 @@ Each finished scenario gets one line. The run ends with a summary that lists eve
 `.jewelry/report.html` is the same result to look at: per failure the golden frame next to the run's frame with the differing pixels in red, every snapshot that changed, the frames per step of both, and both recordings to play. It is rewritten after every scenario, so it is there when a run is stopped halfway.
 
 `jewelry accept` runs nothing. A failed comparison leaves its complete recording in `.jewelry/failures/`, and accept copies that over the golden, snapshots included. `jewelry accept "Diary note"` takes one scenario. A scenario whose step failed is refused: that run stopped halfway.
+
+`jewelry video <scenario>` writes `.jewelry/videos/<scenario>.<profile>.mp4`: an H.264 video of the golden, a few hundred kilobytes where the APNG is tens of megabytes, that plays in Slack or a browser. The name is a folder under `.jewelry/goldens`, or a unique part of one. App frames keep their 60 Hz timing; phone frames (lock screen, home screen), taken about once a second while the scenario waited, show for a tenth of a second each.
 
 ### Defaults in `jewelry.yaml`
 

@@ -24,6 +24,7 @@ import 'package:jewelry/src/run_progress.dart';
 import 'package:jewelry/src/scenario_recording.dart';
 import 'package:jewelry/src/scenario_result.dart';
 import 'package:jewelry/src/scenario_suite.dart';
+import 'package:jewelry/src/video.dart';
 import 'package:jewelry/src/slug.dart';
 import 'package:jewelry/src/snapshots.dart';
 
@@ -134,6 +135,48 @@ Future<void> main(List<String> argv) async {
         );
       }
       exit(refused.isEmpty ? 0 : 1);
+    case 'video':
+      // jewelry video <scenario>...: the golden of each, as an MP4 to share.
+      final wantedNames = args.rest.sublist(1);
+      if (wantedNames.isEmpty) {
+        print(
+          'Usage: jewelry video <scenario>... (a name under .jewelry/goldens)',
+        );
+        exit(64);
+      }
+      final goldens = Directory('.jewelry/goldens');
+      final known = goldens.existsSync()
+          ? [
+              for (final d in goldens.listSync().whereType<Directory>())
+                d.path.split('/').last,
+            ]
+          : <String>[];
+      var failed = false;
+      for (final want in wantedNames) {
+        // An exact name, or a part of one that names a single scenario.
+        final hits = known.contains(want)
+            ? [want]
+            : known.where((k) => k.contains(slug(want))).toList();
+        if (hits.length != 1) {
+          print(
+            hits.isEmpty
+                ? 'No golden matches "$want".'
+                : '"$want" matches ${hits.length}: ${hits.join(', ')}',
+          );
+          failed = true;
+          continue;
+        }
+        for (final p in profiles) {
+          final base = '.jewelry/goldens/${hits.single}/${p.name}';
+          if (!File('$base.apng').existsSync()) continue;
+          final out = File('.jewelry/videos/${hits.single}.${p.name}.mp4');
+          await writeVideo(ScenarioRecording.read(base), out);
+          print(
+            '${out.path}  ${(out.lengthSync() / 1e6).toStringAsFixed(1)} MB',
+          );
+        }
+      }
+      exit(failed ? 1 : 0);
     case 'run':
       final names = {for (final p in profiles) p.name};
       final files =
