@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:clock/clock.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+
+import 'app_timers.dart';
 
 /// Puts the integration test binding on a harness-driven clock.
 ///
@@ -33,20 +37,28 @@ class JewelryBinding {
     final engineBeginFrame = b.platformDispatcher.onBeginFrame!;
     final engineDrawFrame = b.platformDispatcher.onDrawFrame!;
     // Builds and layout read [appClock] too, not only the test's own code.
+    // So are timers a build or a frame callback makes (see AppTimers).
+    Zone frameZone() => timersOnAppClock ? AppTimers.frameZone : Zone.root;
     b.platformDispatcher.onBeginFrame = (_) =>
-        withClock(appClock, () => engineBeginFrame(now));
+        frameZone().run(() => withClock(appClock, () => engineBeginFrame(now)));
     b.platformDispatcher.onDrawFrame = () =>
-        withClock(appClock, engineDrawFrame);
+        frameZone().run(() => withClock(appClock, engineDrawFrame));
     return _binding = b;
   }
 
   /// Moves the clock; [ScenarioTester] calls this before every pump.
   ///
   /// ponytail: pumps still wait the real duration (the live binding uses a
-  /// Timer), so a scenario runs at real-time pace. Timer and Future.delayed
-  /// in the app also run on wall time. Only animation timestamps are
-  /// harness-driven.
-  static void advance(Duration d) => now += d;
+  /// Timer), so a scenario runs at real-time pace. The app's own timers run
+  /// on [appClock] during a scenario ([AppTimers]).
+  static void advance(Duration d) {
+    now += d;
+    if (timersOnAppClock) AppTimers.pumped();
+  }
+
+  /// True while a scenario runs on a device: the app's timers follow
+  /// [appClock].
+  static bool timersOnAppClock = false;
 
   /// What `clock.now()` returns in the app during a scenario: the minute the
   /// scenario started (the CLI sets the device clock just before) plus the
@@ -57,8 +69,20 @@ class JewelryBinding {
   /// server timestamps and other isolates (notification actions) keep the
   /// device clock.
   static final appClock = Clock(
-    () => _startMinute?.add(now - _nowAtStart + waited) ?? DateTime.now(),
+    () =>
+        _startMinute?.add(
+          now -
+              _nowAtStart +
+              waited +
+              (waitingSince == null
+                  ? Duration.zero
+                  : DateTime.now().difference(waitingSince!)),
+        ) ??
+        DateTime.now(),
   );
+
+  /// When the `t.wait` in progress started; its time counts as it passes.
+  static DateTime? waitingSince;
   static DateTime? _startMinute;
   static Duration _nowAtStart = Duration.zero;
 

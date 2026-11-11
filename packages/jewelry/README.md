@@ -106,6 +106,8 @@ Each finished scenario gets one line. The run ends with a summary that lists eve
 
 A failure plays the golden and this run side by side on one play button and one bar. Steps are lined up: a step lasts as long as the slower recording takes, and the faster one holds on its last frame, dimmed, saying how much shorter its step was. Playback stops at every difference (red marks on the bar) with both recordings on the frame in question and the difference in red beside them. When the change is intended, **Accept this run as the new golden** does what `jewelry accept` does for that scenario, after a confirmation.
 
+The app's own `Timer`s and `Future.delayed`s run on recording time during a scenario: a popup that shows 5 s after login appears the same number of frames after login every run, however slow the emulator. Timers from the test framework, jewelry, gesture recognizers and your scenario code stay on wall time.
+
 Some widgets animate on their own clock: a hint that starts after a wall-clock timer, a progress indicator that pulses as long as a step is open. Leave them out of the comparison instead of the whole step:
 
 ```dart

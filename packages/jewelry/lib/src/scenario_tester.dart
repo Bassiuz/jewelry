@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'device_actions.dart';
 import 'frame_capture.dart';
 import 'host_channel.dart';
+import 'app_timers.dart';
 import 'jewelry_binding.dart';
 import 'on_screen.dart';
 import 'target.dart';
@@ -60,11 +63,20 @@ class ScenarioTester {
     Duration duration, {
     Duration every = const Duration(seconds: 1),
   }) async {
-    final begin = DateTime.now();
+    final begin = JewelryBinding.waitingSince = DateTime.now();
+    // The app's timers come due as the wait goes on (see AppTimers).
+    final ticker = JewelryBinding.timersOnAppClock
+        ? Zone.root.createPeriodicTimer(
+            const Duration(milliseconds: 50),
+            (_) => AppTimers.fireDue(),
+          )
+        : null;
     try {
       await _wait(duration, every);
     } finally {
+      ticker?.cancel();
       // The app's clock counts it as passed (see JewelryBinding.appClock).
+      JewelryBinding.waitingSince = null;
       JewelryBinding.waited += DateTime.now().difference(begin);
     }
   }
