@@ -1,7 +1,9 @@
 name: jewelry_firebase
 description: Firebase Emulator Suite support and Dart seeding for jewelry integration scenarios.
-version: 0.1.0
-repository: https://github.com/bassiuz/jewelry
+version: 0.0.1
+repository: https://github.com/Bassiuz/jewelry
+issue_tracker: https://github.com/Bassiuz/jewelry/issues
+topics: [testing, golden, integration-test, video, firebase]
 resolution: workspace
 
 environment:
@@ -11,7 +13,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  jewelry: ^0.1.0
+  jewelry: ">=0.0.1 <0.1.0"
   firebase_core: ^4.4.0
   firebase_auth: ^6.1.4
   cloud_firestore: ^6.10.1
