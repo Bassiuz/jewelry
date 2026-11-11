@@ -50,6 +50,16 @@ class FirebaseEmulatorConfig {
     worker: worker,
   );
 
+  /// Every port these emulators listen on, for the check before starting.
+  List<int> get ports => [
+    authPort,
+    firestorePort,
+    hubPort,
+    9150 + 10 * worker, // Firestore websocket
+    4500 + 10 * worker, // logging
+    if (only.contains('functions')) functionsPort,
+  ];
+
   /// Which worker this is the config of; 0 without parallel devices.
   final int worker;
 

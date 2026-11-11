@@ -12,13 +12,17 @@ class FirebaseEmulators {
   File? _config;
 
   Future<void> start() async {
-    if (await _hubUp()) {
-      // A previous run that was killed leaves its emulators behind; a new
-      // suite then fails to bind and the stale one answers with old state.
+    // A previous run that was killed can leave an emulator behind (the
+    // Java Firestore emulator outlives a killed firebase CLI). Starting
+    // next to it fails halfway or talks to stale state: say who holds what.
+    final taken = <String>[
+      for (final port in config.ports)
+        if (!await _free(port)) await _holder(port),
+    ];
+    if (taken.isNotEmpty) {
       throw StateError(
-        'Firebase emulators are already running (hub on port '
-        '${config.hubPort}). Stop them first: '
-        'lsof -ti :${config.hubPort},:${config.firestorePort},:${config.authPort} | xargs kill',
+        'Firebase emulator ports are taken, from an earlier run that did not '
+        'stop cleanly?\n  ${taken.join('\n  ')}',
       );
     }
     // Workers past the first get their own ports through a firebase.json
@@ -115,6 +119,9 @@ class FirebaseEmulators {
     if (_config?.existsSync() ?? false) _config!.deleteSync();
     final p = _process;
     if (p == null) return;
+    // The emulators run as children of the firebase CLI (a Java Firestore
+    // emulator); killed alone, the CLI leaves them holding their ports.
+    final children = await _descendants(p.pid);
     p.kill(ProcessSignal.sigint);
     await p.exitCode.timeout(
       const Duration(seconds: 20),
@@ -123,5 +130,57 @@ class FirebaseEmulators {
         return -1;
       },
     );
+    for (final pid in children) {
+      Process.killPid(pid, ProcessSignal.sigkill);
+    }
+  }
+
+  static Future<bool> _free(int port) async {
+    try {
+      final s = await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
+      await s.close();
+      return true;
+    } on SocketException {
+      return false;
+    }
+  }
+
+  /// `port 8110: java (PID 57919, started Wed Nov 11 10:11:04 2026)`.
+  static Future<String> _holder(int port) async {
+    final r = await Process.run('lsof', [
+      '-nP',
+      '-iTCP:$port',
+      '-sTCP:LISTEN',
+      '-Fpc',
+    ]);
+    final lines = (r.stdout as String).split('\n');
+    final pid = lines
+        .firstWhere((l) => l.startsWith('p'), orElse: () => '')
+        .replaceFirst('p', '');
+    if (pid.isEmpty) return 'port $port: in use';
+    final name = lines
+        .firstWhere((l) => l.startsWith('c'), orElse: () => 'c?')
+        .substring(1);
+    final ps = await Process.run('ps', ['-o', 'lstart=,command=', '-p', pid]);
+    final started = (ps.stdout as String).trim();
+    final what = started.contains('cloud-firestore-emulator')
+        ? 'a Firestore emulator'
+        : started.contains('firebase')
+        ? 'a Firebase emulator'
+        : name;
+    return 'port $port: $what (PID $pid, started '
+        '${started.length >= 24 ? started.substring(0, 24) : started}) '
+        '- stop it with: kill $pid';
+  }
+
+  /// The PIDs under [pid], children first-level and deeper.
+  static Future<List<int>> _descendants(int pid) async {
+    final r = await Process.run('pgrep', ['-P', '$pid']);
+    final children = [
+      for (final l in (r.stdout as String).split('\n')) ?int.tryParse(l.trim()),
+    ];
+    return [
+      for (final c in children) ...[c, ...await _descendants(c)],
+    ];
   }
 }

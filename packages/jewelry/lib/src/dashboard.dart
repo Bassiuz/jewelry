@@ -63,6 +63,11 @@ class Dashboard {
         '',
       );
 
+  /// [worker] stopped early: its emulator or its Firebase emulators could
+  /// not start. Shown on its card instead of a status.
+  void failed(String profile, int worker, Object error) =>
+      _worker(profile, worker).error = '$error'.replaceFirst('Bad state: ', '');
+
   /// The booted device of [worker], for its live screen.
   void attach(String profile, int worker, Device device) =>
       _worker(profile, worker).device = device;
@@ -173,6 +178,7 @@ class Dashboard {
           'profile': w.profile,
           'worker': w.worker,
           'status': w.status,
+          'error': w.error,
           'test': w.test,
           'steps': w.steps,
           'step': w.step,
@@ -358,6 +364,7 @@ class _Worker {
   final String profile;
   final int worker;
   String status = 'starting';
+  String? error;
   Device? device;
   String? test;
   List<String> steps = [];

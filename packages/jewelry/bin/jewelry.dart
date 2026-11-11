@@ -359,7 +359,10 @@ Future<bool> _run({
             drift: drift,
             rest: rest,
             tolerance: tolerance,
-          ).catchError((Object e) => errors.add(e)),
+          ).catchError((Object e) {
+            errors.add(e);
+            _dashboard?.failed(profile.name, worker, e);
+          }),
       ]);
       if (errors.isNotEmpty) {
         progress.close();

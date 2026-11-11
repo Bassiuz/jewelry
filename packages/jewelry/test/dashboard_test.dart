@@ -47,5 +47,10 @@ void main() {
     expect(((state['tests'] as List).first as Map)['state'], 'failed');
     expect(((state['tests'] as List).last as Map)['state'], 'queued');
     expect(await get(''), contains('<title>jewelry</title>'));
+
+    d.failed('pixel', 3, StateError('Firebase emulator ports are taken'));
+    state = jsonDecode(await get('state.json')) as Map;
+    final w4 = (state['workers'] as List).firstWhere((w) => w['worker'] == 3) as Map;
+    expect(w4['error'], 'Firebase emulator ports are taken');
   });
 }

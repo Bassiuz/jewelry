@@ -42,7 +42,8 @@ background:linear-gradient(110deg,#efece5 35%,#faf8f4 50%,#efece5 65%);backgroun
 .loader b{color:var(--ink);font-size:13px}
 .spin{width:30px;height:30px;border-radius:50%;border:3px solid #ddd8cd;border-top-color:var(--run);animation:spin .9s linear infinite}
 .screen.on .loader{display:none}
-.card.stopped .loader{animation:none;background:#efece5}.card.stopped .spin{border-top-color:#ddd8cd;animation:none}
+.card.stopped .loader{animation:none;background:#efece5}
+.card.failed .loader b{color:var(--bad)} .card.failed .loader span{white-space:pre-wrap;word-break:break-word;text-align:left;font-size:11px}.card.stopped .spin{border-top-color:#ddd8cd;animation:none}
 @keyframes shimmer{to{background-position:-250% 0}}@keyframes spin{to{transform:rotate(360deg)}}
 .card .info{flex:1;min-width:0}
 .card .who{color:var(--dim);font-size:12px}
@@ -125,7 +126,8 @@ function renderLive(){
     const [title,sub]=phase(w, test);
     card.querySelector('.loader b').textContent=title;
     card.querySelector('.loader span').textContent=sub;
-    card.classList.toggle('stopped',/shutting down|stopped/.test(w.status));
+    card.classList.toggle('stopped',!!w.error||/shutting down|stopped/.test(w.status));
+    card.classList.toggle('failed',!!w.error);
     card.querySelector('.who').textContent=`${w.profile} · emulator ${w.worker+1} · ${test?'running':title.toLowerCase()}`;
     card.querySelector('.test').textContent=test?(test.labels[0]||test.name):'';
     const at=w.steps.indexOf(w.step);
@@ -135,6 +137,7 @@ function renderLive(){
 }
 // What an emulator without a screen yet is doing, as a title and a detail.
 function phase(w,test){
+  if(w.error)return ['Stopped',w.error];
   const s=w.status||'';
   if(/shutting down/.test(s))return ['Shutting down','Out of scenarios, or stopped early (the run says why at the end)'];
   if(/building/.test(s))return ['Building the app','Once for the whole run'];
