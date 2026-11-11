@@ -1,9 +1,13 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'comparison_result.dart';
 import 'diff_png.dart';
+import 'captured_frame.dart';
 import 'scenario_recording.dart';
+import 'slug.dart';
 import 'snapshots.dart';
+import 'video.dart';
 
 /// Writes `expected.apng`, `actual.apng`, the failing frame of both with
 /// their `diff.png`, and `report.md` into [dir]. The HTML report shows them.
@@ -51,10 +55,34 @@ void writeFailureReport({
     );
   }
 
+  // Where each difference sits in both videos, for the dashboard's player.
+  File('${dir.path}/differences.json').writeAsStringSync(
+    jsonEncode([
+      if (goldenIndex >= 0 && File('${dir.path}/diff.png').existsSync())
+        {
+          'label': '$result',
+          'step': goldenEngine[goldenIndex].step,
+          'golden': _videoTime(golden, goldenEngine[goldenIndex]),
+          'actual': _videoTime(actual, actualEngine[actualIndex]),
+          'diff': 'diff.png',
+        },
+      for (final s in snapshots)
+        if (_snapshotFrame(golden, s.name) case final g?)
+          if (_snapshotFrame(actual, s.name) case final a?)
+            {
+              'label': '$s',
+              'step': g.step,
+              'golden': _videoTime(golden, g),
+              'actual': _videoTime(actual, a),
+              'diff': 'snapshots/${slug(s.name)}.diff.png',
+            },
+    ]),
+  );
+
   File('${dir.path}/report.md').writeAsStringSync('''
 # $scenario on $profile
 
-**$result**
+**${result is ComparisonPassed ? 'The video matches' : '$result'}**
 
 - Golden: ${golden.frames.length} frames (`expected.apng`)
 - Actual: ${actual.frames.length} frames (`actual.apng`)
@@ -80,4 +108,21 @@ String _runs(ScenarioRecording r) {
     }
   }
   return buffer.toString();
+}
+
+CapturedFrame? _snapshotFrame(ScenarioRecording r, String name) {
+  for (final f in r.frames) {
+    if (f.snapshot == name) return f;
+  }
+  return null;
+}
+
+/// Seconds into the video [writeVideo] makes of [r] at which [frame] shows.
+double _videoTime(ScenarioRecording r, CapturedFrame frame) {
+  var at = Duration.zero;
+  for (final f in r.frames) {
+    if (identical(f, frame)) break;
+    at += videoDuration(f);
+  }
+  return at.inMicroseconds / 1e6;
 }

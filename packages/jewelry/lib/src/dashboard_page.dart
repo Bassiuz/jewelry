@@ -63,7 +63,7 @@ ol li.next:before{content:"○ ";color:var(--line)}
 .media video,.media img{width:260px;border-radius:8px;border:1px solid var(--line);background:#111}
 .empty{color:var(--dim)}
 .player{display:flex;gap:16px;align-items:flex-start}
-.player>div:first-child{width:300px}
+.player>div:first-child{min-width:260px}
 .player ol.steps{width:250px;margin-top:20px;max-height:640px;overflow:auto}
 ol.steps li{cursor:pointer;padding:3px 6px;border-radius:5px}
 ol.steps li:hover{background:#ebe7dd}
@@ -74,6 +74,17 @@ ol.steps li.off:after{content:" ◷";color:#e8a33c}
 .vload{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#ddd8cd;font-size:12px;pointer-events:none}
 .vwrap.loading .vload{display:flex}
 .player video{width:300px;display:block;border-radius:8px 8px 0 0;border:1px solid var(--line);background:#111}
+.screens{display:flex;gap:12px;align-items:flex-start}
+.pv{width:260px;position:relative}
+.player video,.pv img{width:260px}
+.held{position:absolute;left:0;right:0;bottom:0;display:none;padding:8px;background:#1d1b19d9;color:#fff;font-size:12px;border-radius:0 0 8px 8px}
+.pv.isheld .held{display:block} .pv.isheld video{filter:saturate(.4) brightness(.85)}
+.diffpane{display:none} .atdiff .diffpane{display:block}
+.atdiff .pv video,.diffpane img{outline:3px solid var(--bad);outline-offset:-1px}
+.diffpane img{border-radius:8px;display:block}
+.dlabel{font-size:12px;color:var(--bad);margin-top:6px}
+.dmark{position:absolute;top:0;bottom:0;width:4px;margin-left:-2px;background:var(--bad);cursor:pointer;z-index:2}
+.hint{margin-left:6px}
 .ctrl{display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .ctrl button{border:0;background:var(--ink);color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:11px}
 .track{position:relative;height:18px;border-radius:4px;overflow:hidden;background:var(--line);cursor:pointer;touch-action:none}
@@ -181,100 +192,152 @@ function renderDetail(){
     else html+=`<p>${esc(r.label)}: ${esc(r.outcome)}, ${r.frames} frames, ${clock(r.durationMs)}</p>`;
   }
   html+='<div class="media">';
-  for(const s of slugs){
-    const name=encodeURIComponent(s);
-    const r=x.results.find(r=>r.slug===s);
-    html+=player('Golden','golden',name,prof,r);
-    if(r&&r.failureDir){
-      html+=player('This run','failure',name,prof,r);
-      for(const [f,c] of [['expected_frame.png','Expected'],['actual_frame.png','Actual'],['diff.png','Difference']])
-        html+=`<figure><figcaption>${c}</figcaption><img src="files/${r.failureDir}/${f}" onerror="this.parentNode.remove()"></figure>`;
-    }
-  }
+  for(const s of slugs)html+=player(s,prof,x.results.find(r=>r.slug===s));
   html+='</div>';
   if(x.state==='queued'||x.state==='running')html+='<p class="empty">Not finished yet: the golden plays above when there is one.</p>';
   html+=`<div class="legend"><span><i style="background:var(--bad)"></i>step that failed</span>
     <span><i style="background:#e8a33c"></i>step took a different time than in the golden</span>
     <span><i style="background:#3d6fb6"></i>phone screen (outside the app)</span>
     <span><i style="background:repeating-linear-gradient(45deg,#0004 0 3px,#d9d4c8 3px 6px)"></i>waiting, not compared</span>
-    <span><i style="background:#fff;border:1px solid var(--line)"></i>snapshot</span></div>`;
+    <span><i style="background:#fff;border:1px solid var(--line)"></i>snapshot</span>
+    <span><i style="background:var(--bad);width:3px"></i>difference: playback stops here</span></div>`;
   html+='<p><a href="files/report.html" target="_blank">Full report</a></p></div>';
   $('#main').innerHTML=html;
-  initPlayers(x);
+  initPlayers();
   $('#back').onclick=()=>{selected=null;history.replaceState(null,'',location.pathname);$('#main').innerHTML='';$('#main').dataset.shown='';render();};
 }
-function player(caption,kind,name,prof,r){
-  return `<figure class="player" data-kind="${kind}" data-path="${kind}/${name}/${prof}" data-failed="${esc(r&&r.outcome==='failed'?r.step||'':'')}">
-    <div><figcaption>${caption}</figcaption><div class="vwrap loading"><video muted playsinline preload="auto" src="video/${kind}/${name}/${prof}"></video><div class="vload"><div class="spin"></div><span>Loading the video…</span></div></div>
-    <div class="ctrl"><button>▶</button><span class="time">00:00</span></div>
+// One player per scenario: the golden and, for a failure, this run, side by
+// side on one clock. Steps are lined up: a step lasts as long as the slower
+// recording takes, and the faster one holds its last frame meanwhile.
+// Playback stops at every difference, with the diff image beside both.
+function player(s,prof,r){
+  const name=encodeURIComponent(s);
+  const vids=[['Golden','golden']]; if(r&&r.failureDir)vids.push(['This run','failure']);
+  return `<figure class="player" data-name="${name}" data-prof="${prof}" data-dir="${r&&r.failureDir?esc(r.failureDir):''}" data-failed="${esc(r&&r.outcome==='failed'?r.step||'':'')}">
+    <div class="pmain"><div class="screens">${vids.map(([c,k])=>`<div class="pv" data-kind="${k}"><figcaption>${c}</figcaption>
+      <div class="vwrap loading"><video muted playsinline preload="auto" src="video/${k}/${name}/${prof}"></video>
+      <div class="vload"><div class="spin"></div><span>Loading the video…</span></div><div class="held"></div></div></div>`).join('')}
+      <div class="pv diffpane"><figcaption>Difference, in red</figcaption><img alt=""><div class="dlabel"></div></div></div>
+    <div class="ctrl"><button>▶</button><span class="time">00:00</span><span class="hint"></span></div>
     <div class="track"><div class="head"></div></div><div class="nowstep"></div></div>
     <ol class="steps"></ol></figure>`;
 }
-// Seconds per step in a timeline.
-const perStep=tl=>tl.reduce((m,r)=>(m[r.step]=(m[r.step]||0)+r.end-r.start,m),{});
-async function initPlayers(x){
-  const figs=[...document.querySelectorAll('.player')];
-  const tls={};
-  await Promise.all(figs.map(async f=>{
-    try{tls[f.dataset.path]=await (await fetch('timeline/'+f.dataset.path)).json();}
-    catch(e){f.remove();}
-  }));
-  for(const f of figs){
-    const tl=tls[f.dataset.path]; if(!tl||!tl.length)continue;
-    // The other recording of the same scenario, to see which steps took longer.
-    const other=Object.entries(tls).find(([k])=>k!==f.dataset.path&&k.split('/')[1]===f.dataset.path.split('/')[1]);
-    const mine=perStep(tl), theirs=other?perStep(other[1]):null;
-    setupPlayer(f,tl,mine,theirs,f.dataset.failed);
+async function initPlayers(){
+  for(const f of [...document.querySelectorAll('.player')]){
+    const pvs=[...f.querySelectorAll('.pv[data-kind]')];
+    const tls=await Promise.all(pvs.map(p=>fetch(`timeline/${p.dataset.kind}/${f.dataset.name}/${f.dataset.prof}`).then(r=>r.ok?r.json():null).catch(()=>null)));
+    const recs=pvs.map((p,i)=>({el:p,v:p.querySelector('video'),tl:tls[i]})).filter(r=>{if(r.tl&&r.tl.length)return true;r.el.remove();return false;});
+    if(!recs.length){f.remove();continue;}
+    let diffs=[];
+    if(f.dataset.dir&&recs.length===2&&recs[0].el.dataset.kind==='golden'){
+      try{diffs=await (await fetch(`files/${f.dataset.dir}/differences.json`)).json();}catch(e){}
+    }
+    setupPlayer(f,recs,diffs,f.dataset.failed);
   }
 }
-function setupPlayer(f,tl,mine,theirs,failed){
-  const v=f.querySelector('video'), track=f.querySelector('.track'), head=f.querySelector('.head');
-  const btn=f.querySelector('button'), time=f.querySelector('.time'), now=f.querySelector('.nowstep');
-  v.onerror=()=>f.remove();
-  const total=tl[tl.length-1].end;
-  // Step bands: consecutive runs of one step.
-  const bands=[];
-  for(const r of tl){const b=bands[bands.length-1]; if(b&&b.step===r.step)b.end=r.end; else bands.push({step:r.step,start:r.start,end:r.end});}
-  let html='', list='';
-  bands.forEach((b,i)=>{
-    const a=mine[b.step], t=theirs?theirs[b.step]:null;
-    const off=theirs&&(t===undefined||Math.abs(a-t)>Math.max(0.5,0.25*Math.max(a,t)));
-    const cls=b.step===failed?'bad':off?'off':(i%2?'b':'a');
-    const why=theirs?` · ${a.toFixed(1)} s here, ${t===undefined?'missing':t.toFixed(1)+' s'} in the other`:` · ${(b.end-b.start).toFixed(1)} s`;
-    html+=`<div class="band ${cls}" style="left:${100*b.start/total}%;width:${100*(b.end-b.start)/total}%" title="${esc(b.step+why)}"></div>`;
-    list+=`<li data-i="${i}" class="${cls==='bad'||cls==='off'?cls:''}" title="${esc(why.slice(3))}">${esc(b.step)}</li>`;
-  });
-  // The same steps beside the video, following it; a click jumps there.
-  const steps=f.querySelector('ol.steps'); steps.innerHTML=list;
-  const items=[...steps.children];
-  steps.onclick=e=>{const li=e.target.closest('li');if(!li)return;v.currentTime=toVideo(bands[+li.dataset.i].start)+0.01;show();};
-  for(const r of tl){
-    if(r.kind!=='app')html+=`<div class="seg ${r.kind}" style="left:${100*r.start/total}%;width:${100*(r.end-r.start)/total}%"></div>`;
-    if(r.snapshot)html+=`<div class="tick" style="left:${100*r.start/total}%" title="snapshot: ${esc(r.snapshot)}"></div>`;
+const bandsOf=tl=>{const b=[];for(const r of tl){const l=b[b.length-1];if(l&&l.step===r.step)l.end=r.end;else b.push({step:r.step,start:r.start,end:r.end});}return b;};
+function setupPlayer(f,recs,diffs,failed){
+  const track=f.querySelector('.track'), head=f.querySelector('.head'), btn=f.querySelector('button');
+  const time=f.querySelector('.time'), hint=f.querySelector('.hint'), now=f.querySelector('.nowstep');
+  const pane=f.querySelector('.diffpane');
+  // Line the steps up: each golden step with the next step of the same name in this run.
+  const B=recs.map(r=>bandsOf(r.tl)), segs=[];
+  let j=0;
+  for(const g of B[0]){
+    let a=null;
+    if(B[1]){const k=B[1].findIndex((x,i)=>i>=j&&x.step===g.step);if(k>=0){a=B[1][k];j=k+1;}}
+    const parts=B[1]?[g,a]:[g];
+    segs.push({step:g.step,parts,len:Math.max(...parts.filter(Boolean).map(p=>p.end-p.start))});
   }
+  let total=0; for(const s of segs){s.at=total;total+=s.len;}
+  const segAt=T=>{let i=0;while(i+1<segs.length&&segs[i+1].at<=T)i++;return i;};
+  // Master time of second t in recording i.
+  const masterOf=(i,t)=>{for(const s of segs){const p=s.parts[i];if(p&&t>=p.start&&t<p.end)return s.at+t-p.start;}return total;};
+  // Where recording i is at master time T, and whether it is holding.
+  const pos=(i,T)=>{
+    const si=segAt(T), s=segs[si], p=s.parts[i];
+    if(!p){let k=si;while(k>=0&&!segs[k].parts[i])k--;
+      return {t:k<0?0:segs[k].parts[i].end-0.02,held:true,note:'This run has no such step'};}
+    const local=T-s.at, d=p.end-p.start;
+    if(local>=d)return {t:Math.max(p.start,p.end-0.02),held:true,note:`Holding: this step took ${(s.len-d).toFixed(1)} s less here`};
+    return {t:p.start+local,held:false};
+  };
+  // The MP4 keeps the timeline's times; it only runs a little longer at the end.
+  const toVideo=(r,t)=>t;
+  for(const d of diffs)d.T=masterOf(0,d.golden);
+  // The bar: one band per step, coloured when it failed or took a different time.
+  let html='', list='';
+  segs.forEach((s,i)=>{
+    const [g,a]=s.parts, dg=g.end-g.start, da=a?a.end-a.start:null;
+    const off=recs.length>1&&(a===null||Math.abs(dg-da)>Math.max(0.5,0.25*Math.max(dg,da)));
+    const cls=s.step===failed?'bad':off?'off':(i%2?'b':'a');
+    const why=recs.length>1?`${dg.toFixed(1)} s in the golden, ${a?da.toFixed(1)+' s':'missing'} in this run`:`${dg.toFixed(1)} s`;
+    html+=`<div class="band ${cls}" style="left:${100*s.at/total}%;width:${100*s.len/total}%" title="${esc(s.step+' · '+why)}"></div>`;
+    list+=`<li data-i="${i}" class="${cls==='bad'||cls==='off'?cls:''}" title="${esc(why)}">${esc(s.step)}</li>`;
+  });
+  for(const r of recs[0].tl){
+    const a=masterOf(0,r.start), b=masterOf(0,r.end-1e-6);
+    if(r.kind!=='app')html+=`<div class="seg ${r.kind}" style="left:${100*a/total}%;width:${100*(b-a)/total}%"></div>`;
+    if(r.snapshot)html+=`<div class="tick" style="left:${100*a/total}%" title="snapshot: ${esc(r.snapshot)}"></div>`;
+  }
+  diffs.forEach((d,i)=>html+=`<div class="dmark" data-d="${i}" style="left:${100*d.T/total}%" title="${esc(d.label)}"></div>`);
   track.insertAdjacentHTML('afterbegin',html);
-  // The video's own length can differ from the timeline by a frame or two.
-  const toVideo=s=>v.duration?s*v.duration/total:s, toTimeline=s=>v.duration?s*total/v.duration:s;
-  const show=()=>{const s=toTimeline(v.currentTime);head.style.left=(100*s/total)+'%';
-    time.textContent=`${clock(v.currentTime*1000)} / ${clock((v.duration||total)*1000)}`;
-    const r=tl.find(r=>s>=r.start&&s<r.end)||tl[tl.length-1];
-    const at=Math.max(0,bands.findIndex(b=>s>=b.start&&s<b.end));
-    items.forEach((li,i)=>{li.classList.toggle('done',i<at);li.classList.toggle('now',i===at);li.classList.toggle('next',i>at);});
-    if(!v.paused&&items[at])items[at].scrollIntoView({block:'nearest'});
-    now.innerHTML=`${esc(r.step)}${r.kind==='device'?' <span class="counts">(phone screen)</span>':''}`;
-    btn.textContent=v.paused?'▶':'❚❚';};
-  const loop=()=>{show();if(!v.paused)requestAnimationFrame(loop);};
-  // The first request makes the MP4 on the Mac, so it can take a while; show that it is coming.
-  const wrap=f.querySelector('.vwrap'), loading=on=>wrap.classList.toggle('loading',on);
-  if(v.readyState>=3)loading(false);
-  v.onwaiting=()=>loading(true); v.oncanplay=v.onplaying=()=>loading(false);
-  v.onplay=loop; v.onpause=show; v.onseeked=show; v.onloadedmetadata=show; v.onended=show;
-  btn.onclick=()=>v.paused?v.play():v.pause();
-  v.onclick=btn.onclick;
-  const seek=e=>{const box=track.getBoundingClientRect();const frac=Math.min(1,Math.max(0,(e.clientX-box.left)/box.width));
-    v.currentTime=toVideo(frac*total);show();};
-  track.onpointerdown=e=>{track.setPointerCapture(e.pointerId);seek(e);track.onpointermove=seek;};
-  track.onpointerup=e=>{track.onpointermove=null;};
+  const steps=f.querySelector('ol.steps'); steps.innerHTML=list; const items=[...steps.children];
+  let T=0, playing=false, last=0, atDiff=null;
+  const sync=()=>recs.forEach((r,i)=>{
+    const q=atDiff?{t:i===0?atDiff.golden:atDiff.actual,held:false}:pos(i,T), target=toVideo(r,q.t);
+    r.el.classList.toggle('isheld',q.held); r.el.querySelector('.held').textContent=q.held?'⏸ '+q.note:'';
+    if(playing&&!q.held){
+      if(r.v.paused){r.v.currentTime=target;r.v.play().catch(()=>{});}
+      else if(Math.abs(r.v.currentTime-target)>0.25)r.v.currentTime=target;
+    }else{
+      if(!r.v.paused)r.v.pause();
+      if(Math.abs(r.v.currentTime-target)>0.03)r.v.currentTime=target;
+    }
+  });
+  const show=()=>{
+    head.style.left=(100*T/total)+'%';
+    time.textContent=`${clock(T*1000)} / ${clock(total*1000)}`;
+    const si=segAt(T);
+    items.forEach((li,i)=>{li.classList.toggle('done',i<si);li.classList.toggle('now',i===si);li.classList.toggle('next',i>si);});
+    if(playing&&items[si])items[si].scrollIntoView({block:'nearest'});
+    const g=recs[0].tl.find(r=>{const t=pos(0,T).t;return t>=r.start&&t<r.end;});
+    now.innerHTML=`${esc(segs[si].step)}${g&&g.kind==='device'?' <span class="counts">(phone screen)</span>':''}`;
+    btn.textContent=playing?'❚❚':'▶';
+    hint.textContent=atDiff?'Stopped at a difference; play to go on':diffs.length?`${diffs.length} difference${diffs.length>1?'s':''}: playback stops at each red mark`:'';
+    f.classList.toggle('atdiff',!!atDiff);
+  };
+  const showDiff=d=>{atDiff=d;pane.querySelector('img').src=`files/${f.dataset.dir}/${d.diff}`;pane.querySelector('.dlabel').textContent=d.label;sync();show();};
+  const pause=()=>{playing=false;sync();show();};
+  const tick=t=>{
+    if(!playing)return;
+    const dt=Math.min(0.1,(t-last)/1000); last=t;
+    // Wait for a video that is still loading, so both stay on the same step.
+    const buffering=recs.some((r,i)=>!pos(i,T).held&&r.v.readyState<3);
+    if(!buffering){
+      const prev=T; T=Math.min(total,T+dt);
+      const d=diffs.find(d=>d.T>prev&&d.T<=T);
+      if(d){T=d.T;playing=false;showDiff(d);return;}
+      if(T>=total){pause();return;}
+    }
+    sync();show();requestAnimationFrame(tick);
+  };
+  const play=()=>{if(T>=total)T=0;atDiff=null;playing=true;last=performance.now();sync();show();requestAnimationFrame(tick);};
+  btn.onclick=()=>playing?pause():play();
+  recs.forEach(r=>{
+    r.v.onclick=btn.onclick;
+    const wrap=r.el.querySelector('.vwrap'), loading=on=>wrap.classList.toggle('loading',on);
+    if(r.v.readyState>=3)loading(false);
+    r.v.onwaiting=()=>loading(true); r.v.oncanplay=r.v.onplaying=()=>loading(false);
+    r.v.onloadedmetadata=()=>sync();
+    r.v.onerror=()=>r.el.remove();
+  });
+  steps.onclick=e=>{const li=e.target.closest('li');if(!li)return;T=segs[+li.dataset.i].at+0.01;atDiff=null;sync();show();};
+  const seek=e=>{const box=track.getBoundingClientRect();T=total*Math.min(1,Math.max(0,(e.clientX-box.left)/box.width));atDiff=null;sync();show();};
+  track.onpointerdown=e=>{
+    if(e.target.classList.contains('dmark')){const d=diffs[+e.target.dataset.d];playing=false;T=d.T;showDiff(d);return;}
+    track.setPointerCapture(e.pointerId);seek(e);track.onpointermove=seek;};
+  track.onpointerup=()=>{track.onpointermove=null;};
   show();
 }
 poll();

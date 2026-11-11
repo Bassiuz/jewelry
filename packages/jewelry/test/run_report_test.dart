@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,7 @@ import 'package:jewelry/src/report.dart';
 import 'package:jewelry/src/run_log.dart';
 import 'package:jewelry/src/run_progress.dart';
 import 'package:jewelry/src/scenario_result.dart';
+import 'package:jewelry/src/snapshots.dart';
 
 import 'test_png.dart';
 
@@ -166,5 +168,32 @@ void main() {
     expect(out.toString(), contains('0/4 · 0 passed · 0 failed · 00:00 / ~1:30:00'));
     expect(out.toString(), contains('▶ login_test.dart · 00:00 · Log in as Anna'));
     expect(progress.elapsed, lessThan(const Duration(seconds: 5)));
+  });
+
+  test('a failure report says where each difference sits in both videos', () {
+    // The snapshot is the third frame in the golden and the second in this run.
+    final golden = ScenarioRecording([
+      pixel(1, 1, 1),
+      pixel(2, 2, 2),
+      CapturedFrame(step: 'Home', png: pixel(9, 9, 9).png, snapshot: 'Home'),
+    ]);
+    final actual = ScenarioRecording([
+      pixel(1, 1, 1),
+      CapturedFrame(step: 'Home', png: pixel(8, 8, 8).png, snapshot: 'Home'),
+    ]);
+    writeFailureReport(
+      dir: Directory('${dir.path}/f'),
+      scenario: 'Home',
+      profile: 'pixel',
+      golden: golden,
+      actual: actual,
+      result: const ComparisonPassed(maxDrift: 0),
+      snapshots: [const SnapshotMismatch('Home', '100% differs')],
+    );
+    final [d] = jsonDecode(File('${dir.path}/f/differences.json').readAsStringSync()) as List;
+    expect(d['golden'], closeTo(2 / 60, 1e-4));
+    expect(d['actual'], closeTo(1 / 60, 1e-4));
+    expect(d['diff'], 'snapshots/home.diff.png');
+    expect(File('${dir.path}/f/report.md').readAsStringSync(), contains('**The video matches**'));
   });
 }
