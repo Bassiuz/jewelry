@@ -25,7 +25,8 @@ li:hover{background:#f1efe9} li.sel{background:#ebe7dd}
 li .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 li .t{color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
 .dot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--line)}
-.passed .dot{background:var(--ok)} .failed .dot{background:var(--bad)}
+.passed .dot,.failed .dot{background:none;border-radius:0;width:12px;height:auto;font-weight:700;font-size:13px;line-height:1;text-align:center}
+.passed .dot::after{content:'✓';color:var(--ok)} .failed .dot::after{content:'✗';color:var(--bad)}
 .recorded .dot{background:var(--rec)}
 .running .dot,.judging .dot{background:var(--run);animation:p 1s infinite alternate}
 @keyframes p{to{opacity:.3}}
@@ -103,6 +104,7 @@ function endTime(){
   const end=new Date(Date.now()+Math.max(0,state.estimateMs-state.elapsedMs));
   return end.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
 }
+const stateTitle={queued:'Queued',running:'Running',judging:'Being compared',passed:'Passed: matches its golden',failed:'Failed',recorded:'Recorded: a new golden, nothing to compare against'};
 function render(){
   const t=state.tests, done=t.filter(x=>['passed','failed','recorded'].includes(x.state));
   const failed=t.filter(x=>x.state==='failed').length;
@@ -110,7 +112,7 @@ function render(){
   $('#bar').style.width=(t.length?100*done.length/t.length:0)+'%';
   $('#tests').innerHTML=t.map(x=>{
     const ms=x.results[0]?.durationMs; const label=x.labels[0]||x.name;
-    return `<li class="${x.state}${selected===x.key?' sel':''}" data-key="${esc(x.key)}"><span class="dot"></span>
+    return `<li class="${x.state}${selected===x.key?' sel':''}" data-key="${esc(x.key)}"><span class="dot" title="${stateTitle[x.state]||x.state}"></span>
       <span class="name" title="${esc(x.file)}">${esc(label)}</span><span class="t">${ms?clock(ms):x.state==='queued'?'':x.state}</span></li>`;
   }).join('');
   selected?renderDetail():renderLive();
