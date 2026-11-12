@@ -91,6 +91,10 @@ ol.steps li.off:after{content:" ◷";color:#e8a33c}
 .hint{margin-left:6px;flex:1;min-width:0}
 .ctrl{display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .ctrl button{border:0;background:var(--ink);color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:11px}
+.pmain{position:relative}
+.hover{position:absolute;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:11px;line-height:1.5;padding:4px 7px;border-radius:5px;pointer-events:none;display:none;z-index:5;max-width:260px;width:max-content}
+.hover b{font-weight:600}
+.legend span.hl{color:var(--ink);font-weight:600;outline:2px solid var(--ink);outline-offset:2px;border-radius:3px}
 .track{position:relative;height:18px;border-radius:4px;overflow:hidden;background:var(--line);cursor:pointer;touch-action:none}
 .band{position:absolute;top:0;bottom:0;border-right:1px solid #fff8}
 .band.a{background:#d9d4c8}.band.b{background:#cbc5b7}
@@ -217,13 +221,15 @@ function renderDetail(){
   for(const s of slugs)html+=player(s,prof,x.results.find(r=>r.slug===s));
   html+='</div>';
   if(x.state==='queued'||x.state==='running')html+='<p class="empty">Not finished yet: the golden plays above when there is one.</p>';
-  html+=`<div class="legend"><span><i class="band bad"><b>✗</b></i>step that failed</span>
-    <span><i class="band off"><b>◷</b></i>step took a different time than in the golden</span>
-    <span><i class="seg device"></i>phone screen (outside the app)</span>
-    <span><i style="background:repeating-linear-gradient(45deg,#0004 0 3px,#d9d4c8 3px 6px)"></i>waiting, not compared</span>
-    <span><i class="tick"></i>snapshot</span>
-    <span><i class="dmark"></i>difference: playback stops here</span>
-    <span><i class="mask"><span></span></i>on the video: left out of the comparison</span></div>`;
+  html+=`<div class="legend"><span data-k="step"><i style="background:linear-gradient(90deg,#d9d4c8 50%,#cbc5b7 50%)"></i>a step (light and dark take turns)</span>
+    <span data-k="failed"><i class="band bad"><b>✗</b></i>step that failed</span>
+    <span data-k="off"><i class="band off"><b>◷</b></i>step took a different time than in the golden</span>
+    <span data-k="device"><i class="seg device"></i>phone screen (outside the app)</span>
+    <span data-k="wait"><i style="background:repeating-linear-gradient(45deg,#0004 0 3px,#d9d4c8 3px 6px)"></i>waiting, not compared</span>
+    <span data-k="snapshot"><i class="tick"></i>snapshot</span>
+    <span data-k="diff"><i class="dmark"></i>difference: playback stops here</span>
+    <span data-k="mask"><i class="mask"><span></span></i>on the video: left out of the comparison</span></div>
+    <p class="counts">Point at the bar to see which of these is there.</p>`;
   html+='<p><a href="files/report.html" target="_blank">Full report</a></p></div>';
   $('#main').innerHTML=html;
   for(const b of document.querySelectorAll('button.accept'))b.onclick=async()=>{
@@ -250,7 +256,7 @@ function player(s,prof,r){
       <div class="masks"></div><div class="vload"><div class="spin"></div><span>Loading the video…</span></div><div class="held"></div></div></div>`).join('')}
       <div class="pv diffpane"><figcaption>Difference, in red</figcaption><img alt=""><div class="dlabel"></div></div></div>
     <div class="ctrl"><button>▶</button><span class="time">00:00</span><span class="hint"></span></div>
-    <div class="track"><div class="head"></div></div><div class="nowstep"></div></div>
+    <div class="track"><div class="head"></div></div><div class="hover"></div><div class="nowstep"></div></div>
     <ol class="steps"></ol></figure>`;
 }
 async function initPlayers(){
@@ -305,16 +311,18 @@ function setupPlayer(f,recs,diffs,failed){
     const off=recs.length>1&&(a===null||Math.abs(dg-da)>Math.max(0.5,0.25*Math.max(dg,da)));
     const cls=s.step===failed?'bad':off?'off':(i%2?'b':'a');
     const why=recs.length>1?`${dg.toFixed(1)} s in the golden, ${a?da.toFixed(1)+' s':'missing'} in this run`:`${dg.toFixed(1)} s`;
+    s.kind=cls==='bad'?'failed':cls==='off'?'off':'step'; s.why=why;
     const glyph=cls==='bad'?'✗':cls==='off'?'◷':'';
-    html+=`<div class="band ${cls}" style="left:${100*s.at/total}%;width:${100*s.len/total}%" title="${esc(s.step+' · '+why)}"><b>${glyph}</b></div>`;
+    html+=`<div class="band ${cls}" style="left:${100*s.at/total}%;width:${100*s.len/total}%"><b>${glyph}</b></div>`;
     list+=`<li data-i="${i}" class="${cls==='bad'||cls==='off'?cls:''}" title="${esc(why)}">${esc(s.step)}</li>`;
   });
+  const snaps=[];
   for(const r of recs[0].tl){
     const a=masterOf(0,r.start), b=masterOf(0,r.end-1e-6);
     if(r.kind!=='app')html+=`<div class="seg ${r.kind}" style="left:${100*a/total}%;width:${100*(b-a)/total}%"></div>`;
-    if(r.snapshot)html+=`<div class="tick" style="left:${100*a/total}%" title="snapshot: ${esc(r.snapshot)}"></div>`;
+    if(r.snapshot){snaps.push({T:a,name:r.snapshot});html+=`<div class="tick" style="left:${100*a/total}%"></div>`;}
   }
-  diffs.forEach((d,i)=>html+=`<div class="dmark" data-d="${i}" style="left:${100*d.T/total}%" title="${esc(d.label)}"></div>`);
+  diffs.forEach((d,i)=>html+=`<div class="dmark" data-d="${i}" style="left:${100*d.T/total}%"></div>`);
   track.insertAdjacentHTML('afterbegin',html);
   const steps=f.querySelector('ol.steps'); steps.innerHTML=list; const items=[...steps.children];
   let T=0, playing=false, last=0, atDiff=null;
@@ -391,6 +399,30 @@ function setupPlayer(f,recs,diffs,failed){
     if(e.target.classList.contains('dmark')){const d=diffs[+e.target.dataset.d];playing=false;T=d.T;showDiff(d);return;}
     track.setPointerCapture(e.pointerId);seek(e);track.onpointermove=seek;};
   track.onpointerup=()=>{track.onpointermove=null;};
+  const hover=f.querySelector('.hover'), legend=[...document.querySelectorAll('.legend [data-k]')];
+  const describe=T=>{
+    const s=segs[segAt(T)], out=[];
+    out.push([s.kind,s.kind==='failed'?'✗ step that failed':s.kind==='off'?`◷ took a different time: ${s.why}`:'a step']);
+    const t=pos(0,T).t, g=recs[0].tl.find(r=>t>=r.start&&t<r.end);
+    if(g&&g.kind==='wait')out.push(['wait','waiting, not compared']);
+    if(g&&g.kind==='device')out.push(['device','phone screen (outside the app)']);
+    if(g&&g.ignore&&g.ignore.length)out.push(['mask',`${g.ignore.length} area${g.ignore.length>1?'s':''} left out of the comparison`]);
+    const near=6*total/track.clientWidth;
+    for(const p of snaps)if(Math.abs(p.T-T)<near)out.push(['snapshot',`snapshot "${p.name}"`]);
+    for(const d of diffs)if(Math.abs(d.T-T)<near)out.push(['diff',`difference: ${d.label}`]);
+    return {step:s.step,out};
+  };
+  track.addEventListener('pointermove',e=>{
+    const box=track.getBoundingClientRect(), x=Math.min(box.width,Math.max(0,e.clientX-box.left));
+    const {step,out}=describe(total*x/box.width);
+    hover.innerHTML=`<b>${esc(step)}</b><br>${out.map(o=>esc(o[1])).join('<br>')}`;
+    hover.style.display='block';
+    hover.style.left=(track.offsetLeft+x)+'px';
+    hover.style.top=(track.offsetTop-hover.offsetHeight-6)+'px';
+    const keys=new Set(out.map(o=>o[0]));
+    legend.forEach(el=>el.classList.toggle('hl',keys.has(el.dataset.k)));
+  });
+  track.addEventListener('pointerleave',()=>{hover.style.display='none';legend.forEach(el=>el.classList.remove('hl'));});
   show();
 }
 poll();
