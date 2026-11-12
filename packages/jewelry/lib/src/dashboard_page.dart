@@ -88,7 +88,7 @@ ol.steps li.off:after{content:" ◷";color:#e8a33c}
 .diffpane img{border-radius:8px;display:block}
 .dlabel{font-size:12px;color:var(--bad);margin-top:6px}
 .dmark{position:absolute;top:-4px;bottom:-4px;width:6px;margin-left:-3px;background:repeating-linear-gradient(0deg,#000 0 3px,#fff 3px 6px);outline:1px solid #000;cursor:pointer;z-index:2}
-.hint{margin-left:6px}
+.hint{margin-left:6px;flex:1;min-width:0}
 .ctrl{display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .ctrl button{border:0;background:var(--ink);color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:11px}
 .track{position:relative;height:18px;border-radius:4px;overflow:hidden;background:var(--line);cursor:pointer;touch-action:none}
@@ -102,6 +102,9 @@ ol.steps li.off:after{content:" ◷";color:#e8a33c}
 .tick{position:absolute;top:0;width:6px;height:6px;margin-left:-3px;background:#fff;border:1px solid #000;transform:rotate(45deg) translate(-1px,-1px)}
 .head{position:absolute;top:-2px;bottom:-2px;width:3px;margin-left:-1px;background:var(--ink);border-radius:2px;pointer-events:none}
 .nowstep{font-size:12px;margin-top:5px;min-height:1.4em}
+/* Text under and beside the bar wraps within the videos' width, so the bar
+   keeps one width while the step and its states change. */
+.nowstep,.ctrl{width:0;min-width:100%}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:4px 0 10px}
 .legend i{display:inline-block;position:relative;width:18px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-2px}
 .legend i.band b{line-height:12px;font-size:9px}
