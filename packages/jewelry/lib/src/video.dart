@@ -108,6 +108,7 @@ List<Map<String, Object?>> videoTimeline(String stepsJson) {
           ? 'wait'
           : 'app',
       if (run['snapshot'] != null) 'snapshot': run['snapshot'],
+      if (run['ignore'] != null) 'ignore': run['ignore'],
     });
     at += length;
   }

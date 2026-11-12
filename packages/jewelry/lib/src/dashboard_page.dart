@@ -87,21 +87,34 @@ ol.steps li.off:after{content:" ◷";color:#e8a33c}
 .atdiff .pv video,.diffpane img{outline:3px solid var(--bad);outline-offset:-1px}
 .diffpane img{border-radius:8px;display:block}
 .dlabel{font-size:12px;color:var(--bad);margin-top:6px}
-.dmark{position:absolute;top:0;bottom:0;width:4px;margin-left:-2px;background:var(--bad);cursor:pointer;z-index:2}
+.dmark{position:absolute;top:-4px;bottom:-4px;width:6px;margin-left:-3px;background:repeating-linear-gradient(0deg,#000 0 3px,#fff 3px 6px);outline:1px solid #000;cursor:pointer;z-index:2}
 .hint{margin-left:6px}
 .ctrl{display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .ctrl button{border:0;background:var(--ink);color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:11px}
 .track{position:relative;height:18px;border-radius:4px;overflow:hidden;background:var(--line);cursor:pointer;touch-action:none}
 .band{position:absolute;top:0;bottom:0;border-right:1px solid #fff8}
 .band.a{background:#d9d4c8}.band.b{background:#cbc5b7}
-.band.off{background:#e8a33c}.band.bad{background:var(--bad)}
+.band.off{background:#e8a33c radial-gradient(#3a2600 1.3px,transparent 1.6px) 0 0/6px 6px}
+.band.bad{background:repeating-linear-gradient(45deg,#000a 0 2px,transparent 2px 6px),repeating-linear-gradient(-45deg,#000a 0 2px,transparent 2px 6px),var(--bad)}
+.band b{display:block;text-align:center;font-size:11px;line-height:18px;color:#fff;text-shadow:0 0 2px #000;overflow:hidden;white-space:nowrap}
 .seg{position:absolute;bottom:0;height:5px}
-.seg.device{background:#3d6fb6}.seg.wait{background:repeating-linear-gradient(45deg,#0003 0 3px,transparent 3px 6px);height:100%}
-.tick{position:absolute;top:0;width:2px;height:7px;background:#fff}
+.seg.device{background:repeating-linear-gradient(90deg,#3d6fb6 0 3px,#fff 3px 5px);height:7px;border-top:1px solid #000}.seg.wait{background:repeating-linear-gradient(45deg,#0003 0 3px,transparent 3px 6px);height:100%}
+.tick{position:absolute;top:0;width:6px;height:6px;margin-left:-3px;background:#fff;border:1px solid #000;transform:rotate(45deg) translate(-1px,-1px)}
 .head{position:absolute;top:-2px;bottom:-2px;width:3px;margin-left:-1px;background:var(--ink);border-radius:2px;pointer-events:none}
 .nowstep{font-size:12px;margin-top:5px;min-height:1.4em}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin:4px 0 10px}
-.legend i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.legend i{display:inline-block;position:relative;width:18px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-2px}
+.legend i.band b{line-height:12px;font-size:9px}
+.legend i.tick{width:7px;height:7px;margin:0 7px 0 4px;transform:rotate(45deg)}
+.legend i.dmark{width:6px;margin:0 6px 0 2px;position:relative;top:0;bottom:0}
+.legend i.seg{position:relative;height:7px}
+.legend i.mask{position:relative;display:inline-block}
+.nowstep .state{color:var(--dim)}
+.masks{position:absolute;left:1px;top:1px;right:1px;bottom:1px;pointer-events:none;overflow:hidden}
+.mask{position:absolute;outline:2px dashed #000;outline-offset:-1px;background:repeating-linear-gradient(45deg,#ffd400aa 0 5px,#0000 5px 10px)}
+.mask span,.masks.wait:after{position:absolute;left:0;top:0;background:#ffd400;color:#000;font-size:10px;font-weight:600;padding:1px 4px}
+.masks.wait{background:repeating-linear-gradient(45deg,#0005 0 4px,#0000 4px 12px);outline:3px dashed #ffd400;outline-offset:-3px}
+.masks.wait:after{content:'not compared: waiting'}
 </style></head><body>
 <aside><header><h1><img src="logo.svg" alt="">jewelry</h1><div class="counts" id="counts"></div><div class="bar"><i id="bar"></i></div></header>
 <ul id="tests"></ul></aside>
@@ -201,12 +214,13 @@ function renderDetail(){
   for(const s of slugs)html+=player(s,prof,x.results.find(r=>r.slug===s));
   html+='</div>';
   if(x.state==='queued'||x.state==='running')html+='<p class="empty">Not finished yet: the golden plays above when there is one.</p>';
-  html+=`<div class="legend"><span><i style="background:var(--bad)"></i>step that failed</span>
-    <span><i style="background:#e8a33c"></i>step took a different time than in the golden</span>
-    <span><i style="background:#3d6fb6"></i>phone screen (outside the app)</span>
+  html+=`<div class="legend"><span><i class="band bad"><b>✗</b></i>step that failed</span>
+    <span><i class="band off"><b>◷</b></i>step took a different time than in the golden</span>
+    <span><i class="seg device"></i>phone screen (outside the app)</span>
     <span><i style="background:repeating-linear-gradient(45deg,#0004 0 3px,#d9d4c8 3px 6px)"></i>waiting, not compared</span>
-    <span><i style="background:#fff;border:1px solid var(--line)"></i>snapshot</span>
-    <span><i style="background:var(--bad);width:3px"></i>difference: playback stops here</span></div>`;
+    <span><i class="tick"></i>snapshot</span>
+    <span><i class="dmark"></i>difference: playback stops here</span>
+    <span><i class="mask"><span></span></i>on the video: left out of the comparison</span></div>`;
   html+='<p><a href="files/report.html" target="_blank">Full report</a></p></div>';
   $('#main').innerHTML=html;
   for(const b of document.querySelectorAll('button.accept'))b.onclick=async()=>{
@@ -230,7 +244,7 @@ function player(s,prof,r){
   return `<figure class="player" data-name="${name}" data-prof="${prof}" data-dir="${r&&r.failureDir?esc(r.failureDir):''}" data-failed="${esc(r&&r.outcome==='failed'?r.step||'':'')}">
     <div class="pmain"><div class="screens">${vids.map(([c,k])=>`<div class="pv" data-kind="${k}"><figcaption>${c}</figcaption>
       <div class="vwrap loading"><video muted playsinline preload="auto" src="video/${k}/${name}/${prof}"></video>
-      <div class="vload"><div class="spin"></div><span>Loading the video…</span></div><div class="held"></div></div></div>`).join('')}
+      <div class="masks"></div><div class="vload"><div class="spin"></div><span>Loading the video…</span></div><div class="held"></div></div></div>`).join('')}
       <div class="pv diffpane"><figcaption>Difference, in red</figcaption><img alt=""><div class="dlabel"></div></div></div>
     <div class="ctrl"><button>▶</button><span class="time">00:00</span><span class="hint"></span></div>
     <div class="track"><div class="head"></div></div><div class="nowstep"></div></div>
@@ -279,6 +293,8 @@ function setupPlayer(f,recs,diffs,failed){
   // The MP4 keeps the timeline's times; it only runs a little longer at the end.
   const toVideo=(r,t)=>t;
   for(const d of diffs)d.T=masterOf(0,d.golden);
+  // A widget can be ignored twice (scenario and step); draw and count it once.
+  for(const r of recs)for(const x of r.tl)if(x.ignore)x.ignore=[...new Map(x.ignore.filter(g=>g[2]>0&&g[3]>0).map(g=>[g.slice(0,4).join(),g])).values()];
   // The bar: one band per step, coloured when it failed or took a different time.
   let html='', list='';
   segs.forEach((s,i)=>{
@@ -286,7 +302,8 @@ function setupPlayer(f,recs,diffs,failed){
     const off=recs.length>1&&(a===null||Math.abs(dg-da)>Math.max(0.5,0.25*Math.max(dg,da)));
     const cls=s.step===failed?'bad':off?'off':(i%2?'b':'a');
     const why=recs.length>1?`${dg.toFixed(1)} s in the golden, ${a?da.toFixed(1)+' s':'missing'} in this run`:`${dg.toFixed(1)} s`;
-    html+=`<div class="band ${cls}" style="left:${100*s.at/total}%;width:${100*s.len/total}%" title="${esc(s.step+' · '+why)}"></div>`;
+    const glyph=cls==='bad'?'✗':cls==='off'?'◷':'';
+    html+=`<div class="band ${cls}" style="left:${100*s.at/total}%;width:${100*s.len/total}%" title="${esc(s.step+' · '+why)}"><b>${glyph}</b></div>`;
     list+=`<li data-i="${i}" class="${cls==='bad'||cls==='off'?cls:''}" title="${esc(why)}">${esc(s.step)}</li>`;
   });
   for(const r of recs[0].tl){
@@ -316,10 +333,29 @@ function setupPlayer(f,recs,diffs,failed){
     items.forEach((li,i)=>{li.classList.toggle('done',i<si);li.classList.toggle('now',i===si);li.classList.toggle('next',i>si);});
     if(playing&&items[si])items[si].scrollIntoView({block:'nearest'});
     const g=recs[0].tl.find(r=>{const t=pos(0,T).t;return t>=r.start&&t<r.end;});
-    now.innerHTML=`${esc(segs[si].step)}${g&&g.kind==='device'?' <span class="counts">(phone screen)</span>':''}`;
+    // The same facts as the bar's patterns, in words.
+    const states=[];
+    if(segs[si].step===failed)states.push('✗ this step failed');
+    const [sg,sa]=segs[si].parts;
+    if(recs.length>1&&sa&&Math.abs((sg.end-sg.start)-(sa.end-sa.start))>Math.max(0.5,0.25*Math.max(sg.end-sg.start,sa.end-sa.start)))
+      states.push(`◷ ${(sg.end-sg.start).toFixed(1)} s in the golden, ${(sa.end-sa.start).toFixed(1)} s in this run`);
+    if(g&&g.kind==='device')states.push('phone screen');
+    if(g&&g.kind==='wait')states.push('waiting, not compared');
+    if(g&&g.ignore&&g.ignore.length)states.push(`${g.ignore.length} area${g.ignore.length>1?'s':''} ignored`);
+    now.innerHTML=`${esc(segs[si].step)}${states.length?` <span class="state">· ${states.map(esc).join(' · ')}</span>`:''}`;
+    recs.forEach((r,i)=>drawMasks(r,atDiff?(i===0?atDiff.golden:atDiff.actual):pos(i,T).t));
     btn.textContent=playing?'❚❚':'▶';
     hint.textContent=atDiff?'Stopped at a difference; play to go on':diffs.length?`${diffs.length} difference${diffs.length>1?'s':''}: playback stops at each red mark`:'';
     f.classList.toggle('atdiff',!!atDiff);
+  };
+  // What the comparison leaves out at second t of a recording: the ignored
+  // areas of that frame, or all of it while waiting.
+  const drawMasks=(r,t)=>{
+    const box=r.el.querySelector('.masks'), run=r.tl.find(x=>t>=x.start&&t<x.end);
+    box.classList.toggle('wait',!!run&&run.kind==='wait');
+    const k=r.v.videoWidth?r.v.clientWidth/r.v.videoWidth:0;
+    box.innerHTML=!k||!run||!run.ignore||run.kind==='wait'?'':run.ignore.map(([x,y,w,h])=>
+      `<div class="mask" style="left:${x*k}px;top:${y*k}px;width:${w*k}px;height:${h*k}px"><span>ignored</span></div>`).join('');
   };
   const showDiff=d=>{atDiff=d;pane.querySelector('img').src=`files/${f.dataset.dir}/${d.diff}`;pane.querySelector('.dlabel').textContent=d.label;sync();show();};
   const pause=()=>{playing=false;sync();show();};
@@ -343,7 +379,7 @@ function setupPlayer(f,recs,diffs,failed){
     const wrap=r.el.querySelector('.vwrap'), loading=on=>wrap.classList.toggle('loading',on);
     if(r.v.readyState>=3)loading(false);
     r.v.onwaiting=()=>loading(true); r.v.oncanplay=r.v.onplaying=()=>loading(false);
-    r.v.onloadedmetadata=()=>sync();
+    r.v.onloadedmetadata=()=>{sync();show();};
     r.v.onerror=()=>r.el.remove();
   });
   steps.onclick=e=>{const li=e.target.closest('li');if(!li)return;T=segs[+li.dataset.i].at+0.01;atDiff=null;sync();show();};
