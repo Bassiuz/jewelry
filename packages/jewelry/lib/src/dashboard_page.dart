@@ -83,7 +83,10 @@ ol.steps li.off:after{content:" ◷";color:#e8a33c}
 .player video,.pv img{width:260px}
 .held{position:absolute;left:0;right:0;bottom:0;display:none;padding:8px;background:#1d1b19d9;color:#fff;font-size:12px;border-radius:0 0 8px 8px}
 .pv.isheld .held{display:block} .pv.isheld video{filter:saturate(.4) brightness(.85)}
-.diffpane{display:none} .atdiff .diffpane{display:block}
+.diffpane{display:none} .atdiff .diffpane,.diffpane.live{display:block}
+.diffpane canvas{width:260px;display:block;border-radius:8px;border:1px solid var(--line);background:#111}
+.diffpane img{display:none} .atdiff .diffpane img{display:block} .atdiff .diffpane canvas{display:none}
+.diffpane .dnote{font-size:11px;color:var(--dim);margin-top:4px;max-width:260px}
 .atdiff .pv video,.diffpane img{outline:3px solid var(--bad);outline-offset:-1px}
 .diffpane img{border-radius:8px;display:block}
 .dlabel{font-size:12px;color:var(--bad);margin-top:6px}
@@ -118,10 +121,10 @@ ol.steps li.off:after{content:" ◷";color:#e8a33c}
 .legend i.mask{position:relative;display:inline-block}
 .nowstep .state{color:var(--dim)}
 .masks{position:absolute;left:1px;top:1px;right:1px;bottom:1px;pointer-events:none;overflow:hidden}
-.mask{position:absolute;outline:2px dashed #000;outline-offset:-1px;background:repeating-linear-gradient(45deg,#ffd400aa 0 5px,#0000 5px 10px)}
-.mask span,.masks.wait:after{position:absolute;left:0;top:0;background:#ffd400;color:#000;font-size:10px;font-weight:600;padding:1px 4px}
-.masks.wait{background:repeating-linear-gradient(45deg,#0005 0 4px,#0000 4px 12px);outline:3px dashed #ffd400;outline-offset:-3px}
-.masks.wait:after{content:'not compared: waiting'}
+.mask{position:absolute;outline:2px dashed #000;outline-offset:-1px;box-shadow:inset 0 0 0 2px #ffd400;background:#ffd4001f}
+.mask span,.masks.wait:after{position:absolute;left:0;top:0;background:#ffd400;color:#000;font-size:9px;font-weight:600;padding:0 3px;opacity:.9}
+.masks.wait{outline:2px dashed #000;outline-offset:-2px;box-shadow:inset 0 0 0 4px #ffd40099}
+.masks.wait:after{content:'waiting: not compared';top:auto;bottom:0}
 </style></head><body>
 <aside><header><h1><img src="logo.svg" alt="">jewelry</h1><div class="counts" id="counts"></div><div class="bar"><i id="bar"></i></div></header>
 <ul id="tests"></ul></aside>
@@ -254,7 +257,7 @@ function player(s,prof,r){
     <div class="pmain"><div class="screens">${vids.map(([c,k])=>`<div class="pv" data-kind="${k}"><figcaption>${c}</figcaption>
       <div class="vwrap loading"><video muted playsinline preload="auto" src="video/${k}/${name}/${prof}"></video>
       <div class="masks"></div><div class="vload"><div class="spin"></div><span>Loading the video…</span></div><div class="held"></div></div></div>`).join('')}
-      <div class="pv diffpane"><figcaption>Difference, in red</figcaption><img alt=""><div class="dlabel"></div></div></div>
+      <div class="pv diffpane"><figcaption>Difference, in red</figcaption><canvas></canvas><img alt=""><div class="dlabel"></div><div class="dnote"></div></div></div>
     <div class="ctrl"><button>▶</button><span class="time">00:00</span><span class="hint"></span></div>
     <div class="track"><div class="head"></div></div><div class="hover"></div><div class="nowstep"></div></div>
     <ol class="steps"></ol></figure>`;
@@ -355,6 +358,7 @@ function setupPlayer(f,recs,diffs,failed){
     if(g&&g.ignore&&g.ignore.length)states.push(`${g.ignore.length} area${g.ignore.length>1?'s':''} ignored`);
     now.innerHTML=`${esc(segs[si].step)}${states.length?` <span class="state">· ${states.map(esc).join(' · ')}</span>`:''}`;
     recs.forEach((r,i)=>drawMasks(r,atDiff?(i===0?atDiff.golden:atDiff.actual):pos(i,T).t));
+    if(!atDiff)drawLive(pos(0,T).t,recs.length>1?pos(1,T).t:0);
     btn.textContent=playing?'❚❚':'▶';
     hint.textContent=atDiff?'Stopped at a difference; play to go on':diffs.length?`${diffs.length} difference${diffs.length>1?'s':''}: playback stops at each red mark`:'';
     f.classList.toggle('atdiff',!!atDiff);
@@ -367,6 +371,40 @@ function setupPlayer(f,recs,diffs,failed){
     const k=r.v.videoWidth?r.v.clientWidth/r.v.videoWidth:0;
     box.innerHTML=!k||!run||!run.ignore||run.kind==='wait'?'':run.ignore.map(([x,y,w,h])=>
       `<div class="mask" style="left:${x*k}px;top:${y*k}px;width:${w*k}px;height:${h*k}px"><span>ignored</span></div>`).join('');
+  };
+  // A third picture next to the two recordings, redrawn with every frame:
+  // the golden faded, with the pixels that clearly differ in this run in red.
+  // Areas the comparison ignores stay faded. Waiting frames are marked too,
+  // to explain a failed step, but labelled as not compared by the test.
+  const live=recs.length===2?pane.querySelector('canvas'):null;
+  if(live){pane.classList.add('live');pane.querySelector('.dnote').textContent='Live from the two videos: a few loose specks can be video compression. At a red mark on the bar the exact difference is shown.';}
+  const scratch=document.createElement('canvas');
+  const drawLive=(tg,ta)=>{
+    const [g,a]=recs.map(r=>r.v);
+    if(!live||!g.videoWidth||!a.videoWidth||g.readyState<2||a.readyState<2)return;
+    const w=260, h=Math.round(w*g.videoHeight/g.videoWidth);
+    live.width=w; live.height=h; scratch.width=w; scratch.height=h;
+    const sx=scratch.getContext('2d',{willReadFrequently:true});
+    sx.drawImage(g,0,0,w,h); const pg=sx.getImageData(0,0,w,h);
+    sx.drawImage(a,0,0,w,h); const pa=sx.getImageData(0,0,w,h).data;
+    const runOf=(r,t)=>r.tl.find(x=>t>=x.start&&t<x.end);
+    const rg=runOf(recs[0],tg), ra=runOf(recs[1],ta);
+    const waiting=(rg&&rg.kind==='wait')||(ra&&ra.kind==='wait');
+    const skip=new Uint8Array(w*h);
+    for(const [r,run] of [[g,rg],[a,ra]])for(const [x,y,ww,hh] of (run&&run.ignore)||[]){
+      const k=w/r.videoWidth;
+      for(let yy=Math.max(0,Math.floor(y*k));yy<Math.min(h,Math.ceil((y+hh)*k));yy++)
+        for(let xx=Math.max(0,Math.floor(x*k));xx<Math.min(w,Math.ceil((x+ww)*k));xx++)skip[yy*w+xx]=1;
+    }
+    const d=pg.data; let changed=0;
+    for(let i=0,p=0;i<d.length;i+=4,p++){
+      const diff=Math.abs(d[i]-pa[i])+Math.abs(d[i+1]-pa[i+1])+Math.abs(d[i+2]-pa[i+2]);
+      if(!skip[p]&&diff>60){d[i]=230;d[i+1]=0;d[i+2]=0;changed++;}
+      else{const m=skip[p]?0.8:0.6;d[i]=d[i]*(1-m)+255*m;d[i+1]=d[i+1]*(1-m)+255*m;d[i+2]=d[i+2]*(1-m)+(skip[p]?120:255)*m;}
+    }
+    live.getContext('2d').putImageData(pg,0,0);
+    const share=changed?`${(100*changed/(w*h)).toFixed(1)}% of the picture differs`:'No visible difference';
+    pane.querySelector('.dlabel').textContent=waiting?`${share} (waiting: the test does not compare these frames)`:share;
   };
   const showDiff=d=>{atDiff=d;pane.querySelector('img').src=`files/${f.dataset.dir}/${d.diff}`;pane.querySelector('.dlabel').textContent=d.label;sync();show();};
   const pause=()=>{playing=false;sync();show();};
@@ -391,6 +429,8 @@ function setupPlayer(f,recs,diffs,failed){
     if(r.v.readyState>=3)loading(false);
     r.v.onwaiting=()=>loading(true); r.v.oncanplay=r.v.onplaying=()=>loading(false);
     r.v.onloadedmetadata=()=>{sync();show();};
+    // A seek shows its frame a moment later; draw the difference then.
+    r.v.addEventListener('seeked',()=>{if(!playing)show();});
     r.v.onerror=()=>r.el.remove();
   });
   steps.onclick=e=>{const li=e.target.closest('li');if(!li)return;T=segs[+li.dataset.i].at+0.01;atDiff=null;sync();show();};

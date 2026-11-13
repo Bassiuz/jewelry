@@ -1,6 +1,6 @@
 name: jewelry
 description: Video goldens for Flutter integration tests. Write scenarios as plain Dart steps, record every frame on a clean emulator, compare frame by frame.
-version: 0.0.1
+version: 0.0.2
 repository: https://github.com/Bassiuz/jewelry
 issue_tracker: https://github.com/Bassiuz/jewelry/issues
 topics: [testing, golden, integration-test, video, emulator]

@@ -1,3 +1,8 @@
+## 0.0.2
+
+- Dashboard: a third picture next to the golden and this run marks in red what differs, live while playing or scrubbing.
+- Dashboard: lighter overlays for ignored areas and waiting frames, so the screen underneath stays readable.
+
 ## 0.0.1
 
 First release.
